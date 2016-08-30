@@ -1,0 +1,384 @@
+RESI NAG1_0;0,0
+UNIT NAG								!Z1
+
+RESI NAG2_0;0,0
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+
+RESI BMA1_0;0,0
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+
+RESI MAN2_0;2,0
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+
+
+RESI MAN3_0;2,1
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+
+
+RESI MAN4_0;2,2
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+UNIT MAN C1 14bb 14bb 16ab 13ab 12aa	!Z8
+
+
+RESI MAN3_0;3,0
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+
+
+RESI MAN4_0;3,1
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+
+
+RESI MAN5_0;3,2
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+UNIT MAN C1 14bb 14bb 16ab 13ab 12aa	!Z8
+
+
+RESI MAN4_0;4,0
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 16ab 16ab 12aa	!Z6
+
+
+RESI MAN5_0;4,1
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 16ab 16ab 12aa	!Z6
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+
+
+RESI MAN6_0;4,2
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 16ab 16ab 12aa	!Z6
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+UNIT MAN C1 14bb 14bb 16ab 13ab 12aa	!Z8
+
+
+RESI MAN2_1;1,0
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+
+RESI MAN3_1;2,0
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+
+RESI MAN4_1;2,1
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+
+RESI MAN5_1;2,2
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+UNIT MAN C1 14bb 14bb 16ab 13ab 12aa	!Z8
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+
+RESI MAN4_1;3,0
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+
+RESI MAN5_1;3,1
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+
+RESI MAN6_1;3,2
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+UNIT MAN C1 14bb 14bb 16ab 13ab 12aa	!Z8
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+
+RESI MAN5_1;4,0
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 16ab 16ab 12aa	!Z6
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+
+RESI MAN6_1;4,1
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 16ab 16ab 12aa	!Z6
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+
+RESI MAN7_1;4,2
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 16ab 16ab 12aa	!Z6
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+UNIT MAN C1 14bb 14bb 16ab 13ab 12aa	!Z8
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+
+RESI MAN3_2;1,0
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+UNIT MAN C1 14bb 14bb 13ab 12aa			!Z10
+
+RESI MAN4_2;2,0
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+UNIT MAN C1 14bb 14bb 13ab 12aa			!Z10
+
+RESI MAN5_2;2,1
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+UNIT MAN C1 14bb 14bb 13ab 12aa			!Z10
+
+RESI MAN6_2;2,2
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+UNIT MAN C1 14bb 14bb 16ab 13ab 12aa	!Z8
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+UNIT MAN C1 14bb 14bb 13ab 12aa			!Z10
+
+RESI MAN5_2;3,0
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+UNIT MAN C1 14bb 14bb 13ab 12aa			!Z10
+
+RESI MAN6_2;3,1
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+UNIT MAN C1 14bb 14bb 13ab 12aa			!Z10
+
+RESI MAN7_2;3,2
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+UNIT MAN C1 14bb 14bb 16ab 13ab 12aa	!Z8
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+UNIT MAN C1 14bb 14bb 13ab 12aa			!Z10
+
+RESI MAN6_2;4,0
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 16ab 16ab 12aa	!Z6
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+UNIT MAN C1 14bb 14bb 13ab 12aa			!Z10
+
+RESI MAN7_2;4,1
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 16ab 16ab 12aa	!Z6
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+UNIT MAN C1 14bb 14bb 13ab 12aa			!Z10
+
+RESI MAN8_2;4,2
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 16ab 16ab 12aa	!Z6
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+UNIT MAN C1 14bb 14bb 16ab 13ab 12aa	!Z8
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+UNIT MAN C1 14bb 14bb 13ab 12aa			!Z10
+
+RESI MAN4_3;1,0
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+UNIT MAN C1 14bb 14bb 13ab 12aa			!Z10
+UNIT MAN C1 14bb 14bb 13ab 12aa 12aa	!Z11
+
+RESI MAN5_3;2,0
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+UNIT MAN C1 14bb 14bb 13ab 12aa			!Z10
+UNIT MAN C1 14bb 14bb 13ab 12aa 12aa	!Z11
+
+RESI MAN6_3;2,1
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+UNIT MAN C1 14bb 14bb 13ab 12aa			!Z10
+UNIT MAN C1 14bb 14bb 13ab 12aa 12aa	!Z11
+
+RESI MAN7_3;2,2
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+UNIT MAN C1 14bb 14bb 16ab 13ab 12aa	!Z8
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+UNIT MAN C1 14bb 14bb 13ab 12aa			!Z10
+UNIT MAN C1 14bb 14bb 13ab 12aa 12aa	!Z11
+
+RESI MAN6_3;3,0
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+UNIT MAN C1 14bb 14bb 13ab 12aa			!Z10
+UNIT MAN C1 14bb 14bb 13ab 12aa 12aa	!Z11
+
+RESI MAN7_3;3,1
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+UNIT MAN C1 14bb 14bb 13ab 12aa			!Z10
+UNIT MAN C1 14bb 14bb 13ab 12aa 12aa	!Z11
+
+RESI MAN8_3;3,2
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+UNIT MAN C1 14bb 14bb 16ab 13ab 12aa	!Z8
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+UNIT MAN C1 14bb 14bb 13ab 12aa			!Z10
+UNIT MAN C1 14bb 14bb 13ab 12aa 12aa	!Z11
+
+RESI MAN7_3;4,0
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 16ab 16ab 12aa	!Z6
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+UNIT MAN C1 14bb 14bb 13ab 12aa			!Z10
+UNIT MAN C1 14bb 14bb 13ab 12aa 12aa	!Z11
+
+RESI MAN8_3;4,1
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 16ab 16ab 12aa	!Z6
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+UNIT MAN C1 14bb 14bb 13ab 12aa			!Z10
+UNIT MAN C1 14bb 14bb 13ab 12aa 12aa	!Z11
+
+RESI MAN9_3;4,2
+UNIT NAG								!Z1
+UNIT NAG C1 14bb						!Z2
+UNIT BMA C1 14bb 14bb					!Z3
+UNIT MAN C1 14bb 14bb 16ab				!Z4
+UNIT MAN C1 14bb 14bb 16ab 16ab			!Z5
+UNIT MAN C1 14bb 14bb 16ab 16ab 12aa	!Z6
+UNIT MAN C1 14bb 14bb 16ab 13ab			!Z7
+UNIT MAN C1 14bb 14bb 16ab 13ab 12aa	!Z8
+UNIT MAN C1 14bb 14bb 13ab				!Z9
+UNIT MAN C1 14bb 14bb 13ab 12aa			!Z10
+UNIT MAN C1 14bb 14bb 13ab 12aa 12aa	!Z11
+

@@ -1,0 +1,28 @@
+!DIHE: first 4 atoms form the dihedral the follwing atoms are the intra residue atoms
+
+PRES 12aa
+RES MAN MAN
+DIHE 1C1  1C2  1O2  2C1
+DIHE 1C2  1O2  2C1  2O5
+
+
+
+PRES 16ab
+RES MAN MAN
+DIHE 1O5  1C5  1C6  1O6  1O6
+DIHE 1C5  1C6  1O6  2C1
+DIHE 1C6  1O6  2C1  2O5
+
+
+PRES 13ab
+RES MAN MAN
+DIHE 1C2  1C3  1O3  2C1
+DIHE 1C3  1O3  2C1  2O5
+
+
+PRES 14bb
+RES NAG NAG
+RES NAG MAN
+DIHE 1C3  1C4  1O4  2C1
+DIHE 1C4  1O4  2C1  2O5
+

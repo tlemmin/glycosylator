@@ -1,0 +1,17 @@
+!DUMMY residue topology
+!used to build a residue de novo
+
+MASS 42 DUM  42  D !
+
+RESI DUMMY 0.000
+ATOM D1   DUM    42  !
+ATOM D2   DUM    42  !
+ATOM D3   DUM    42  !
+
+PRES DUMMY_MAN 0
+!Patch for building a MAN
+BOND 1D3 2C1              !
+!    I     J    K    L      R(IK)   T(IKJ)    PHI   T(JKL)   R(KL)
+IC   1D1   1D2  1D3  2C1     1.4000  120.00  180.00  120.00   1.4000
+IC   1D2   1D3 2C1   2O5     1.4000  120.00 -120.00  120.00   1.4000
+IC   1D3  2C1  2O5   2C5     1.4000  120.00  180.00  120.00   1.4000
