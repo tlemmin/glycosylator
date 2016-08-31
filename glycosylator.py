@@ -778,21 +778,19 @@ class MoleculeBuilder:
         segn1 = residue1.getSegnames()[0] 
         chid1 = residue1.getChids()[0]
         resi1 = str(residue1.getResnums()[0])
-
         if residue2:
-            segn2 = residue1.getSegnames()[0] 
-            chid2 = residue1.getChids()[0]
-            resi2 = str(residue1.getResnums()[0])
+            segn2 = residue2.getSegnames()[0] 
+            chid2 = residue2.getChids()[0]
+            resi2 = str(residue2.getResnums()[0])
 
         for a in atoms:
             if a[0] == '1':
-                dele_atoms += (segn1, chid1, resi1, a[1:])
+                dele_atoms.append((segn1, chid1, resi1, a[1:]))
             if a[0] == '2':
                 if residue2:
-                    dele_atoms += (segn2, chid2, resi2, a[1:])
+                    dele_atoms.append((segn2, chid2, resi2, a[1:]))
                 else:
                     print "Warning: missing residue2 required for patch " + patch
-
         return dele_atoms
 
     def delete_atoms(self, molecule, dele_atoms):
@@ -804,10 +802,10 @@ class MoleculeBuilder:
         sel = []
         for a in dele_atoms:
             segn, chid, resi, atom_name = a
-            sel.append('(segname ' + segn + ' and chain ' + + ' and resid ' + resi + ' and name ' + atom_name + ' )')
+            sel.append('(segment %s and chain %s and resid %s and name %s)' % (segn, chid, resi, atom_name ))
         sel = 'not (' + ' or '.join(sel) + ')'
-        molecule = molecule.select(sel).copy()
-        
+        aa = molecule.select(sel).copy()
+        return  molecule.select(sel).copy()
 
     def build_from_DUMMY(self, resid, resname, chain, segname, dummy_patch, dummy_coords = [[0, 0, 0], [0, 0, 1], [0, 1, 1]]):
         """Builds residue from DUMMY atoms
@@ -1025,7 +1023,6 @@ class Glycosylator:
             sorted_units =  sorted(glycan_topo.keys(), key = len)
             for unit in sorted_units:
                 new_residue = None
-                print unit
                 if unit in inv_template_glycan_tree:
                     s,c,r = inv_template_glycan_tree[unit].split(',')
                     sel = '(segment %s) and (chain %s) and (resid %s)' % (s, c, r)
@@ -1050,14 +1047,15 @@ class Glycosylator:
                             previous_residue = glycan.select(sel)
                             new_residue, del_atom = self.builder.build_from_patch(previous_residue, resid, glycan_topo[unit], chain, segname, patch)
                             built_glycan[unit] = ','.join([segname, chain, str(resid)])
-                            dele_atoms.append(del_atom)
+                            dele_atoms += del_atom
 
                 if glycan:
                     glycan += new_residue
                 else:
                     glycan = new_residue
                 resid += 1
-        
+        if dele_atoms:
+            glycan = self.builder.delete_atoms(glycan, dele_atoms)     
         return glycan
 
     def get_connectivity_tree (self, glycan_name):

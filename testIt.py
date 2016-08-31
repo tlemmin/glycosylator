@@ -30,4 +30,4 @@ man6  = myGlycosylator.glycosylate('MAN6_1;3,2', template_glycan_tree = connect_
 writePDB('man6.pdb', man6)
 #Build a man8 ab initio
 man8 = myGlycosylator.glycosylate('MAN8_3;3,2')
-writePDB('man8.pdb', man8.select('not hydrogen'))
+writePDB('man8.pdb', man8)
