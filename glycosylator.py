@@ -28,6 +28,9 @@ import math
 import numpy as np
 import networkx as nx
 from prody import *
+from itertools import izip
+
+
 
 SELF_BIN = os.path.dirname(os.path.realpath(sys.argv[0]))
 #sys.path.insert(0, SELF_BIN + '/support')
@@ -77,6 +80,11 @@ def topological_sort(unsorted_graph):
             return ''
             break
     return sorted_graph[::-1]    
+
+def pairwise(iterable):
+    "s -> (s0, s1), (s2, s3), (s4, s5), ..."
+    a = iter(iterable)
+    return izip(a, a)
 
 #####################################################################################
 #						        Topology functions             						#
@@ -361,7 +369,8 @@ class Molecule:
             torsionals: dihedral that can rotate (i.e. not in cycles)
             bond_length: dictionary of bond distance used to guess bonds. Keys are sorted by alphabetical order
         """
-        self.molecule = AtomGroup(name)
+        self.name = name
+        self.molecule = AtomGroup(self.name)
         self.chain = chain
         self.segn = segn
         self.rootAtom = 1
@@ -373,6 +382,7 @@ class Molecule:
         self.interresidue_connectivity = nx.DiGraph()
         self.cycle_id = {}
         self.torsionals = []
+        self.bonded_uptodate = False
 
         #Defines distance for bond length between different element used in guess_bonds()
         self.elements = ['C', 'H', 'N', 'O']
@@ -428,13 +438,47 @@ class Molecule:
     def get_residue(self, resid):
         return self.molecule[self.chain][resid]
 
-    def update_connectivity(self):
+    def update_connectivity(self, update_bonds = True):
         """Updates all the connectivity (bond, angles, dihedrals and graphs)
         """
-        self.guess_bonds()
+        if guessBonds:
+            self.guess_bonds()
         self.guess_angles()
         self.guess_dihedrals()
         self.update_graphs()
+        self.bonded_uptodate = True 
+
+    def set_bonds(self, bonds):
+        """ Define list of bonds in a molecule
+        Parameters:
+            newbonds: list of bonds
+
+        """
+        self.connectivity = nx.Graph()
+        self.connectivity.add_edges_from(newbonds)
+        self.bonds = self.connectivity.edges()
+        self.bonded_uptodate = False
+        
+    def add_residue(self, residue, newbonds, delete_bonds = []):
+        """ Add a new residue to a molecule
+        Parameters:
+            residue: proDy AtomGroup
+            newbonds: list of bonds
+            delete_bonds: list of bonds that should be removed (typically after applying a patch
+
+        """
+        if self.molecule.select('resid ' + ri + 'and chain ' + chid):
+            print 'WARNING! A residue with the same id (resid and chain) already exists. The new residue has not been added'
+            return -1
+
+        natoms = self.molecule.numAtoms()
+        self.molecule += residue
+        self.molecule.setName(self.name)
+        
+        self.connectivity.add_edges_from(newbonds)
+        self.connectivity.remove_edges_from(delete_bonds)
+        self.bonds = self.connectivity.edges()
+        self.bonded_uptodate = False
 
     def guess_bonds(self, default_bond_length = 1.6):
         """Searches for all bonds in molecule
@@ -691,6 +735,7 @@ class MoleculeBuilder:
         Parameters:
             residue: ProDy residue (AtomGroup)
         Retruns:
+            complete_residue: Completed ProDy residue, with coordinates of missing atoms set to (0, 0, 0)
             missing_atoms: list of missing atom names
         """
         complete_residue,atoms = self.new_residue(residue.getResnum(), residue.getResname(), residue.getChid(), residue.getSegname())
@@ -902,6 +947,19 @@ class MoleculeBuilder:
         wt = [r * cost, r * sint * cosp, r * sint * sinp]
         newc = rjk*wt[0] + cross2*wt[1] + cross*wt[2]
         return a3 + newc
+
+    def add_residue_to_molecule(self, molecule, residue, guess_all_bonds):
+        molecule.add 
+    
+    def get_bonds(self, residue):
+        rn = residue.getRenames()[0]
+        bonds = []
+        for a1,a2 in pairwise(self.Topology[rn]['BOND']):
+            i1 = residue.select('name ' + a1).getSerials[0]
+            i2 = residue.select('name ' + a2).getSerials[0]
+            bonds += (i1, i2)
+        return bonds
+
 
 #####################################################################################
 #								Glycosylator										#
