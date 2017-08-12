@@ -38,7 +38,7 @@ SELF_BIN = os.path.dirname(os.path.realpath(sys.argv[0]))
 
 
 #####################################################################################
-#						        Support functions             						#
+#                                Support functions                                     #
 #####################################################################################
 
 def readLinesFromFile(fileName):
@@ -48,9 +48,9 @@ def readLinesFromFile(fileName):
     Returns:
         lines: list with all the lines in a file
     """
-    file = open(fileName,'r') 				 # open the file
-    lines = file.readlines() 				 # read all the lines in the file to the list "lines"
-    file.close() 						         # close the file
+    file = open(fileName,'r')                  # open the file
+    lines = file.readlines()                  # read all the lines in the file to the list "lines"
+    file.close()                                  # close the file
     return lines
 
 def topological_sort(unsorted_graph):
@@ -87,7 +87,7 @@ def pairwise(iterable):
     return izip(a, a)
 
 #####################################################################################
-#						        Topology functions             						#
+#                                Topology functions                                     #
 #####################################################################################
 
 class CHARMMTopology:
@@ -214,10 +214,13 @@ class CHARMMTopology:
         
     def get_atoms(self, resname):
         return self.topology[resname]['ATOM']
-
+    
     def get_ICs(self, resname):
         return self.topology[resname]['IC']
-
+        
+    def get_bonds(self, resname):
+        return self.topology[resname]['BOND']
+        
 class CHARMMParameters:
     """Class for parsing and storing CHARMM parameters files.
         Attributes:
@@ -338,7 +341,7 @@ class CHARMMParameters:
 
 
 #####################################################################################
-#						            Molecule    									#
+#                                    Molecule                                        #
 #####################################################################################
 class Molecule:
     """Class for saving a molecule
@@ -441,7 +444,7 @@ class Molecule:
     def update_connectivity(self, update_bonds = True):
         """Updates all the connectivity (bond, angles, dihedrals and graphs)
         """
-        if guessBonds:
+        if update_bonds:
             self.guess_bonds()
         self.guess_angles()
         self.guess_dihedrals()
@@ -459,26 +462,50 @@ class Molecule:
         self.bonds = self.connectivity.edges()
         self.bonded_uptodate = False
         
-    def add_residue(self, residue, newbonds, delete_bonds = []):
+    def add_residue(self, residue, newbonds, dele_atoms = []):
         """ Add a new residue to a molecule
         Parameters:
             residue: proDy AtomGroup
-            newbonds: list of bonds
-            delete_bonds: list of bonds that should be removed (typically after applying a patch
-
+            newbonds: list of bonds to be added
         """
         if self.molecule.select('resid ' + ri + 'and chain ' + chid):
             print 'WARNING! A residue with the same id (resid and chain) already exists. The new residue has not been added'
             return -1
-
+            
+        if dele_atoms:
+            self.delete_atoms(dele_atoms)
+            
         natoms = self.molecule.numAtoms()
         self.molecule += residue
-        self.molecule.setName(self.name)
+        self.molecule.setTitle(self.name)
+        self.molecule.setSerials(np.arange(natoms)+1)
         
-        self.connectivity.add_edges_from(newbonds)
-        self.connectivity.remove_edges_from(delete_bonds)
+        self.connectivity.add_edges_from(np.array(newbonds) + natoms)
+        #self.connectivity.remove_edges_from(delete_bonds)
         self.bonds = self.connectivity.edges()
-        self.bonded_uptodate = False
+        self.update_connectivity(self, update_bonds = False)
+
+    def delete_atoms(self, dele_atoms):
+        """ removes atoms and bonds from molecule
+        Parameter:
+            del_atoms: serial number of atoms to be deleted
+        """
+        newbonds = []
+        for a in sorted(dele_atoms, reverse = True):
+            for b in self.bonds:
+                if a in b:
+                    continue
+                elif a < b[0]:
+                    b[0] -= 1
+                elif a < b[1]:
+                    b[1] -= 1
+                newbonds.append(b)
+        self.molecule = self.molecule.select('not serial ' + del_atoms.join(' ')).copy()
+        #renumber atoms 
+        self.molecule.setSerial(np.arange(self.molecule.numAtoms()))
+        self.molecule.setTitle(self.name)
+        self.bonds = newbonds
+        self.update_connectivity(self, update_bonds = False)    
 
     def guess_bonds(self, default_bond_length = 1.6):
         """Searches for all bonds in molecule
@@ -510,7 +537,7 @@ class Molecule:
 
             self.connectivity.add_edges_from(bonds)
         self.bonds = self.connectivity.edges()
-            
+    
 
     def guess_angles(self):
         """Searches for all angles in a molecule based on the connectivity
@@ -635,7 +662,7 @@ class Molecule:
             self.torsionals.append(dihe)
 
 #####################################################################################
-#								Builders											#
+#                                Builders                                            #
 #####################################################################################
 class MoleculeBuilder:
     """Class for building/modifying molecule
@@ -655,7 +682,7 @@ class MoleculeBuilder:
             print "unknown force field."
 
 
-    def new_residue(self, resid, resname, chain, segname):
+    def init_new_residue(self, resid, resname, chain, segname):
         """Initializes a residue from scratch
         Parameters:
             resid: residue id (int)
@@ -665,6 +692,7 @@ class MoleculeBuilder:
         Returns:
             residue: AtomGroup with all atoms initialized (from Topology)
             atoms_name: name of of all the atoms in residue
+            bonds: list of bonds (segn,chid,resi,atom_name)
         """
         residue = AtomGroup(resname+str(resid))
         # add all the atoms
@@ -709,7 +737,13 @@ class MoleculeBuilder:
         residue.setIcodes(icode)
         residue.setElements(element)
         residue.setAltlocs(altloc)
-        return residue, atoms_name
+        bonds = []
+        top_bonds = self.Topology.get_bonds(resname)
+
+        id = '%s,%s,%d,' % (segn,chid,resid)
+        for a1,a2 in pairwise(top_bonds):
+            bonds.append((id+a1, id+a2))
+        return residue, atoms_name, bonds
 
     def copy_atom(self, src_atom, dst_atom):
         """copies all the attributes of one atom to another
@@ -737,8 +771,9 @@ class MoleculeBuilder:
         Retruns:
             complete_residue: Completed ProDy residue, with coordinates of missing atoms set to (0, 0, 0)
             missing_atoms: list of missing atom names
+            bonds: list of new bonds
         """
-        complete_residue,atoms = self.new_residue(residue.getResnum(), residue.getResname(), residue.getChid(), residue.getSegname())
+        complete_residue,atoms,bonds = self.init_new_residue(residue.getResnum(), residue.getResname(), residue.getChid(), residue.getSegname())
         missing_atoms = []
         atoms_in_residue = residue.getNames()
         for a in atoms:
@@ -749,7 +784,7 @@ class MoleculeBuilder:
             else:
                 missing_atoms.append(a)
         
-        return complete_residue, missing_atoms
+        return complete_residue, missing_atoms, bonds
 
 
     def build_IC_graph(self, atoms, ics):
@@ -794,8 +829,9 @@ class MoleculeBuilder:
         Returns:
             denovo_residue: complete residue (AtomGroup)
             dele_atoms: list of atoms which should be deleted
+            bonds: list of all new bonds
         """
-        denovo_residue, missing_atoms = self.new_residue(resid, resname, chain, segname)
+        denovo_residue, missing_atoms, bonds = self.init_new_residue(resid, resname, chain, segname)
         ics = self.Topology.patches[patch]['IC']
         #patch_atoms = sorted(set([atom.replace('*', '')[1:] for ic in ics for atom in ic[0:4] if atom.replace('*', '')[0]=='2']))
         patch_atoms = sorted(set([atom.replace('*', '') for ic in ics for atom in ic[0:4] if atom.replace('*', '')[0]=='2']))
@@ -805,8 +841,38 @@ class MoleculeBuilder:
         self.build_missing_atom_coord(denovo_residue, missing_atoms, ics)
         
         dele_atoms = self.dele_atoms(patch, link_residue, denovo_residue)
-        return denovo_residue, dele_atoms
-
+        bonds.extend(self.patch_bonds(patch, link_residue, denovo_residue))
+        return denovo_residue, dele_atoms, bonds
+    
+    def patch_bonds(self, patch, residue1, residue2 = None):
+        """
+        Parameters:
+            patch: name of patch (str)
+            residue1: first residue in patch
+            residue2: second residue in patch. None if not required
+        Returns:
+            bonds: list of bonds
+        """
+        bonds = []
+        segn1 = residue1.getSegnames()[0] 
+        chid1 = residue1.getChids()[0]
+        resi1 = str(residue1.getResnums()[0])
+        if residue2:
+            segn2 = residue2.getSegnames()[0] 
+            chid2 = residue2.getChids()[0]
+            resi2 = str(residue2.getResnums()[0])
+        for a1,a2 in pairwise(self.Topology.patches[patch]['BOND']):
+            b = []
+            for a in [a1,a2]:
+                if a[0] == '1':
+                    b.append((segn1, chid1, resi1, a[1:]))
+                if a[0] == '2':
+                    if residue2:
+                        b.append((segn2, chid2, resi2, a[1:]))
+                    else:
+                        print "Warning BOND: missing residue2 required for patch " + patch
+            bonds.append(b)
+        return bonds
 
 
     def dele_atoms(self, patch, residue1, residue2 = None):
@@ -862,15 +928,17 @@ class MoleculeBuilder:
             dummy_coords: coordinated of dummy atoms
         Returns:
             denovo_residue: complete residue (AtomGroup)
+            bonds: list of all bonds
         """
-        dummy_residue, dummy_atoms = self.new_residue(0, 'DUMMY', 'D', 'DUM')
+        dummy_residue, dummy_atoms, bonds = self.init_new_residue(0, 'DUMMY', 'D', 'DUM')
         counter = 0
         for a in dummy_atoms:
             dummy_residue.select('name ' + a).setCoords([dummy_coords[counter]])
             counter += 1
-        denovo_residue, dele_atoms = self.build_from_patch(dummy_residue, resid, resname, chain, segname, dummy_patch)
+        denovo_residue, dele_atoms, bonds_p = self.build_from_patch(dummy_residue, resid, resname, chain, segname, dummy_patch)
         del dummy_residue
-        return denovo_residue
+        bonds.extend(bonds_p)
+        return denovo_residue, bonds
 
     def build_patch_missing_atom_coord(self, link_residue, residue, missing_atoms, ICs):
         """Builds all missing atoms in residue from a patch linking it to link_residue
@@ -962,7 +1030,7 @@ class MoleculeBuilder:
 
 
 #####################################################################################
-#								Glycosylator										#
+#                                Glycosylator                                        #
 #####################################################################################
 class Glycosylator:
     def __init__(self, topofile, paramfile, force_field = 'charmm'):
@@ -995,7 +1063,7 @@ class Glycosylator:
         for line in lines:                                                             # Loop through each line 
             line = line.split('\n')[0].split('!')[0].split() #remove comments and endl
             if line:
-                if line[0] == 'RESI':	
+                if line[0] == 'RESI':    
                     if residue:
                             residue['#UNIT'] = nbr_units
                             self.connect_topology[resname] = copy.copy(residue)
@@ -1063,12 +1131,11 @@ class Glycosylator:
         """
         #if kwargs is not None:
         #    for key, value in kwargs.iteritems():
-        
-
 
         resid = 1
         dummy_patch = 'DUMMY_MAN'
         glycan = None
+        glycan_bonds = []
         built_glycan = {}
         inv_template_glycan_tree = {}
         dele_atoms = []
@@ -1096,16 +1163,18 @@ class Glycosylator:
                         previous = ' '.join(lunit[:-1])
                         #build first unit form dummy
                         if len(lunit) == 1:
-                            new_residue = self.builder.build_from_DUMMY(resid, glycan_topo[unit], chain, segname, dummy_patch)
+                            new_residue, bonds = self.builder.build_from_DUMMY(resid, glycan_topo[unit], chain, segname, dummy_patch)
+                            glycan_bonds.extend(bonds)
                             built_glycan[unit] = ','.join([segname, chain, str(resid)])
                         elif previous in built_glycan:
                             patch = lunit[-1]
                             s,c,r = built_glycan[previous].split(',')
                             sel = '(segment %s) and (chain %s) and (resid %s)' % (s, c, r)
                             previous_residue = glycan.select(sel)
-                            new_residue, del_atom = self.builder.build_from_patch(previous_residue, resid, glycan_topo[unit], chain, segname, patch)
+                            new_residue, del_atom, bonds = self.builder.build_from_patch(previous_residue, resid, glycan_topo[unit], chain, segname, patch)                           
                             built_glycan[unit] = ','.join([segname, chain, str(resid)])
                             dele_atoms += del_atom
+                            glycan_bonds.extend(bonds)
 
                 if glycan:
                     glycan += new_residue
@@ -1113,8 +1182,16 @@ class Glycosylator:
                     glycan = new_residue
                 resid += 1
         if dele_atoms:
-            glycan = self.builder.delete_atoms(glycan, dele_atoms)     
-        return glycan
+            glycan = self.builder.delete_atoms(glycan, dele_atoms)
+            # remove all non existing bonds
+            tmp_bonds = []
+            for a1,a2 in pairwise(glycan_bonds):
+                if a1 in dele_atoms or a2 in dele_atoms:
+                    continue
+                else:
+                    tmp_bonds.append((a1, a2))
+            glycan_bonds = tmp_bonds
+        return glycan, glycan_bonds
 
     def get_connectivity_tree (self, glycan_name):
         """Builds connectivity tree of a glycan described in the connectivity topology
@@ -1141,7 +1218,7 @@ class Glycosylator:
                 glycan_name: name of glycan (str)
                 fileName: path to output file (str)
         """
-        file = open(fileName,'w') 				 # open the file
+        file = open(fileName,'w')                  # open the file
         file.write('RESI ' + glycan_name + '\n')
         units = self.connect_tree.items()
         units.sort(key=lambda id:len(id[1]))
