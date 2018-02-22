@@ -23,9 +23,13 @@ myGlycosylator = GL.Glycosylator('./support/toppar_charmm/mannose.rtf', './suppo
 myGlycosylator.builder.Topology.read_topology('./support/topology/DUMMY.top')
 myGlycosylator.read_connectivity_topology('./support/topology/mannose.top')
 
-root_atom = root_atom = myMan9.molecule.select('serial 1')
-connect_tree = myGlycosylator.build_connectivity_tree(root_atom, myMan9.molecule)
-#trime it down to man6
+#root_atom = myMan9.molecule.select('serial 1')
+#connect_tree = myGlycosylator.build_connectivity_tree(root_atom, myMan9.molecule)
+myGlycosylator.assign_patches(myMan9)
+print myGlycosylator.identify_glycan(myMan9)
+
+#trim it down to man6
+connect_tree = myGlycosylator.build_connectivity_tree(myMan9.rootRes, myMan9.interresidue_connectivity)
 man6, bonds6  = myGlycosylator.glycosylate('MAN6_1;3,2', template_glycan_tree = connect_tree, template_glycan = myMan9.molecule)
 writePDB('man6.pdb', man6)
 #Build a man8 ab initio

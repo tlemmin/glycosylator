@@ -346,7 +346,12 @@ class CHARMMParameters:
 class Molecule:
     """Class for saving a molecule
     Attributes:
-            molecule: Prody AtomGroup 
+            name: structure name
+            chain: chain id
+            segn: segname
+            id: glycosylator id
+            key: string representation of connectivity
+            molecule: Prody AtomGroup
             bonds: list of all bonds
             angles: list of all angles
             dihedrals: list of all dihedrals
@@ -368,7 +373,7 @@ class Molecule:
             dihedrals: list of all dihedrals
             connectivity: graph for connectivity of molecule (bonds)
             directed_connectivity: directed acyclique graph of molecule
-            cycle_id: dictionary where keys are the serial number of atom in cacles and values the corresponding cycle in directed_connectivity
+            cycle_id: dictionary where keys are the serial number of atom in cycles and values the corresponding cycle in directed_connectivity
             torsionals: dihedral that can rotate (i.e. not in cycles)
             bond_length: dictionary of bond distance used to guess bonds. Keys are sorted by alphabetical order
         """
@@ -377,6 +382,7 @@ class Molecule:
         self.chain = chain
         self.segn = segn
         self.rootAtom = 1
+        self.rootAtom = ','.join([segn, chain, 'O']) 
         self.bonds = []
         self.angles = []
         self.dihedrals = []
@@ -405,10 +411,11 @@ class Molecule:
         """
         writePDB(filename, self.molecule.select(selection))
 
-    def read_molecule_from_PDB(self, filename, update_bonds = True, **kwargs):
+    def read_molecule_from_PDB(self, filename, rootAtom = 1, update_bonds = True, **kwargs):
         """Initialize molecule from a PDB file
         Parameters:
             filename: path to PDB file
+            rootAtom: serial number of root atom
             update_bonds: guess bonds, angles, dihedrals and connectivity based on the distance between atoms in PDB
             **kwargs: any of the following which allows the selection of a subset of the PDB file
                 subset: selection of a subset of the PDB file
@@ -422,11 +429,14 @@ class Molecule:
         """
         PDBmolecule = parsePDB(filename, **kwargs)
         chain = set(PDBmolecule.getChids())
-        segn= set(PDBmolecule.getSegnames())
+        segn = set(PDBmolecule.getSegnames())
+        self.rootAtom = rootAtom
         if len(chain) == 1 and len(segn) == 1:
             self.molecule = PDBmolecule
             self.chain = chain
             self.segn = segn
+            a1 = self.molecule.select('serial ' + str(self.rootAtom))
+            self.rootRes = a1.getSegnames()[0] + ',' + a1.getChids()[0] + ',' + str(a1.getResnums()[0]) 
             if update_bonds:
                 self.update_connectivity()
         else:
@@ -575,6 +585,14 @@ class Molecule:
         excludeSet.remove(node)
         return paths
 
+    def set_rootAtom(self, rootAtom):
+        """Sets the rootAtom and updates all the directed graph
+        """
+        self.rootAtom = rootAtom
+        a1 = self.molecule.select('serial ' + str(self.rootAtom))
+        self.rootRes = a1.getSegnames()[0] + ',' + a1.getChids()[0] + ',' + str(a1.getResnums()[0]) 
+        self.update_graphs()
+
     def update_graphs(self):
         """Updates connectivity and directed graphs.
             - seaches for all cycles in connectivity graph
@@ -616,8 +634,8 @@ class Molecule:
             if a1.getResnums()[0] != a2.getResnums()[0]:
                 r1 = a1.getSegnames()[0] + ',' + a1.getChids()[0] + ',' + str(a1.getResnums()[0])
                 r2 = a2.getSegnames()[0] + ',' + a2.getChids()[0] + ',' + str(a2.getResnums()[0])
-                self.interresidue_connectivity.add_node(r1)
-                self.interresidue_connectivity.add_node(r2)
+                self.interresidue_connectivity.add_node(r1, resname=a1.getResnames()[0])
+                self.interresidue_connectivity.add_node(r2, resname=a2.getResnames()[0])
                 self.interresidue_connectivity.add_edge(r1, r2, patch = '', atoms = a1.getNames()[0] + ':' + a2.getNames()[0])
 
     def define_torsionals(self, hydrogens=True):
@@ -1042,7 +1060,7 @@ class Glycosylator:
         Initializes:
             builder: MoleculeBuilder
             connect_topology: dictionary describing the topology of known glycans
-            glycan_keys: dictionary 
+            glycan_keys: dictionary for identifying glycans (built from connect_topology) 
         """
         self.builder = MoleculeBuilder(topofile, paramfile)
         self.connect_topology = {}
@@ -1050,9 +1068,12 @@ class Glycosylator:
 
     def read_connectivity_topology(self, connectfile):
         """Parse file defining the topology of connectivity trees.
+	This function will initialize connect_topology and glycan_keys
+
         Each connectivity is defined by
             RESI: name of the polyglycan
             UNIT: resname, [list of patches to residue]
+
         Parameter:
             fileName: path to connectivity file
         """
@@ -1075,13 +1096,13 @@ class Glycosylator:
                     nbr_units += 1
         residue['#UNIT'] = nbr_units
         self.connect_topology[resname] = copy.copy(residue)
+	self.build_keys()
 
     def build_keys(self):
         self.glycan_keys = {}
         for res in self.connect_topology:
-            key = [r[0]+' '+' '.join(r[2]) for r in connect_topology[res]['UNIT']]
+            key = [r[0]+' '+' '.join(r[2]) for r in self.connect_topology[res]['UNIT']]
             self.glycan_keys[res] = key
-        return self.glycan_keys
 
     def read_unit(self, unit, residue):
         if len(unit)>2:
@@ -1212,7 +1233,76 @@ class Glycosylator:
             glycan_topo[key] = rn
         return glycan_topo
 
-    def write_connectivity_topology(self, glycan_name, fileName):
+    
+
+    def assign_patches(self, molecule):
+        """Assignes patch names to each edge of interresidue digraph
+        Parameters:
+            molecule: Molecule object
+        """
+        G = molecule.interresidue_connectivity
+        patches = {}
+        atoms = nx.get_edge_attributes(G, 'atoms')
+        for e in G.edges():
+            a1,a2 = atoms[e].split(':')
+            patch = self.find_patch(a1, a2)
+            if not patch:
+                print 'Unknown inter residue bond'
+            u,v=e
+            G[u][v]['patch'] = patch
+        
+    def build_connectivity_tree(self, root_id, G):
+        """Defines the connectivity within a glycan polymer
+           Parameters:
+            root_id: id of first residue of the glycan polymer ('segn,chid,resid')
+            G: directed interresidue graph 
+           Returns:
+            connect_tree: dictionary of glycan connectivity
+        """
+
+        paths = nx.shortest_path(G, source = root_id)
+        #put root residue in dict
+        connect_tree = {}
+        connect_tree[root_id] = ''
+        
+        for n in paths:
+            p = paths[n]
+            edges = zip(p[1:],p[:-1])
+            value = []
+            for e2,e1 in edges:
+                value += [G[e1][e2]['patch']]
+            connect_tree[n] = ' ' .join(value)
+        connect_tree.items().sort(key=lambda id:len(id[1]))
+        return connect_tree
+
+    def identify_glycan(self, molecule):
+        """Identifies glycan name
+        Parameters:
+            molecule: Molecule object
+        """
+        G = molecule.interresidue_connectivity
+        connect_tree = self.build_connectivity_tree(molecule.rootRes, G) 
+        
+        target=[]
+        for r in connect_tree.keys():
+            target.append(G.node[r]['resname'] + ' ' + connect_tree[r])
+        len_target=len(target)
+        
+        for gk in self.glycan_keys:
+            if len(set(target) & set(self.glycan_keys[gk])) == len_target and len(set(self.glycan_keys[gk])) == len_target:
+                break
+            else:
+                gk = ''
+        
+        if gk:
+            molecule.id = gk
+        else:
+            print 'Unknown glycan'
+            gk = ''
+            molecule.id = ''
+        return gk
+    
+    def write_connectivity_topology(self, glycan_name, connect_tree, fileName):
         """Write connectivity tree of a glycan
             Parameters:
                 glycan_name: name of glycan (str)
@@ -1220,114 +1310,11 @@ class Glycosylator:
         """
         file = open(fileName,'w')                  # open the file
         file.write('RESI ' + glycan_name + '\n')
-        units = self.connect_tree.items()
+        units = connect_tree.items()
         units.sort(key=lambda id:len(id[1]))
         for unit in units:
             file.write('UNIT ' + unit[0].get_resname() + ' C1 ' + unit[1] + '\n')
         file.close() 
-    
-    def assign_unit_id(self, structure, rootAtom, bond_length, atomnames_to_patch):
-        """Identify glycan based on connectivity
-            Parameters:
-                structure: glycan structure (AtomGroup)
-                rootAtom: first atom of the glycan polymer (AtomGroup)
-                bond_length: threshold for bond length (float)
-                atomsnames_to_patch: dictionary of connecting atoms to patch (Topology)
-            Returns:
-                connect_tree: dictionary of connections
-        """
-        connectivity = self.find_interresidue_bond(structure, bond_length, atomnames_to_patch)
-        connect_tree = {}
-        connect_tree = build_connectivity_tree(rootAtom, connectivity, connect_tree)
-        connect_tree[rootAtom.get_parent()] = ''
-        connect_tree.items().sort(key=lambda id:len(id[1]))
-        return connect_tree
-    
-
-    def build_connectivity_tree(self, root_atom, structure, bond_length = 1.55, connect_tree = {}):
-        """Defines the connectivity within a glycan polymer
-            Parameters:
-                root_atom: first atom of the glycan polymer (AtomGoup)
-                structure: AtomGroup containing structure 
-                connect_tree: dictionary of glycan connectivity
-            Returns:
-                connect_tree: dictionary of glycan connectivity
-        """
-        #put root residue in connectivity tree
-        if not connect_tree:
-            root_resid = root_atom.getResnums()[0]
-            root_chain = root_atom.getChids()[0]
-            root_segname = root_atom.getSegnames()[0]
-            connect_tree[','.join([root_segname, root_chain, str(root_resid)])] = ''
-
-        while 1:
-            connectivity = self.find_interresidue_bonds(root_atom, structure, bond_length)
-            root_residue = ','.join([root_atom.getSegnames()[0], root_atom.getChids()[0], str(root_atom.getResnums()[0])])
-            
-            if not connectivity:
-                break
-            branch = 0
-            for connect in connectivity:
-                if connect[0] != root_residue:
-                    connect_residue = connect[0]
-                    connect_atom = structure.select('serial ' + connect[1])
-                else:
-                    connect_residue = connect[2]
-                    connect_atom = structure.select('serial ' + connect[3])
-                if root_residue in connect_tree:
-                    connect_tree[connect_residue] = connect_tree[root_residue] + ' ' + connect[-1]
-                else:
-                    connect_tree[connect_residue] = connect[-1]
-                if branch:
-                    self.build_connectivity_tree(connect_atom, structure, bond_length=bond_length, connect_tree=connect_tree)
-                else:
-                    if connect[0] != root_residue:
-                        new_root_atom = structure.select('serial ' + connect[1])
-                    else:
-                        new_root_atom = structure.select('serial ' + connect[3])
-                    branch = 1
-            root_atom = new_root_atom
-        return connect_tree 
-
-    
-    def find_interresidue_bonds(self, root_atom, structure, bond_length = 1.55):
-        """ Searches for all inter residue bonds and checks that a patch connecting two residues exists.
-        Two bonds between the same pair of residue are not allowed
-        Parameters:
-            root_atom: AtomGroup for . bonds to this atom will not be considered
-            structure: AtomGroup of the entire structure (e.g. PDB)
-        Returns
-            connectivity: list of bonds [atom1, atom2, patch]
-        """
-        idx = root_atom.getSerials()[0]
-        root_name = root_atom.getNames()[0]
-        root_resid = root_atom.getResnums()[0]
-        root_chain = root_atom.getChids()[0]
-        root_segname = root_atom.getSegnames()[0]
-        sel = structure.select("(not protein) and (within " + str(bond_length) + " of same residue as serial " + str(idx) + ") and not (same residue as serial " + str(idx) + ")")
-        names = sel.getNames()
-        serials = sel.getSerials()
-        resids = sel.getResnums()
-        chains = sel.getChids()
-        segnames = sel.getSegnames()
-        resnames = sel.getResnames()
-        connectivity = []
-        for n,ss,r,c,s,rn in zip(names, serials, resids, chains, segnames, resnames):
-            sel = structure.select("(same residue as serial " + str(idx) + ") and (within " + str(bond_length) + " of serial " + str(ss) + ")")
-            root_a = sel.getNames()[0]
-            root_serial = sel.getSerials()[0]
-            #
-            if root_a != root_name:
-                patch = self.find_patch(root_a, n)
-                if patch:
-                    key1 = ','.join([root_segname, root_chain, str(root_resid)])
-                    key2 = ','.join([s,c,str(r)])
-                    connectivity.append([key1, str(idx), key2, str(ss), patch])
-                else:
-                    print 'Unknown inter residue bond'
-    
-        return connectivity
-
 
 
     def find_patch(self, atom1, atom2):
@@ -1337,22 +1324,4 @@ class Glycosylator:
         else:
              return ''
 
-        
-    def identify_glycan(self, connect_tree, glycan_keys):
-        """Identify glycan polymer
-            Parameters:
-                connect_tree:
-                glycan_keys:
-            Returns:
-                gk: glycan name (empty string if unknown)
-        """
-        target=[]
-        for r in connect_tree.keys():
-            target.append(r.get_resname() + ' ' + connect_tree[r])
-        len_target=len(target)
-        for gk in glycan_keys:
-                if len(set(target) & set(glycan_keys[gk])) == len_target and len(set(glycan_keys[gk])) == len_target:
-                    return gk
-        print 'Unknown glycan'
-        return ''
      
