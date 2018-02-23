@@ -23,8 +23,7 @@ myGlycosylator = GL.Glycosylator('./support/toppar_charmm/mannose.rtf', './suppo
 myGlycosylator.builder.Topology.read_topology('./support/topology/DUMMY.top')
 myGlycosylator.read_connectivity_topology('./support/topology/mannose.top')
 
-#root_atom = myMan9.molecule.select('serial 1')
-#connect_tree = myGlycosylator.build_connectivity_tree(root_atom, myMan9.molecule)
+#identify glycan
 myGlycosylator.assign_patches(myMan9)
 print myGlycosylator.identify_glycan(myMan9)
 
@@ -32,6 +31,24 @@ print myGlycosylator.identify_glycan(myMan9)
 connect_tree = myGlycosylator.build_connectivity_tree(myMan9.rootRes, myMan9.interresidue_connectivity)
 man6, bonds6  = myGlycosylator.glycosylate('MAN6_1;3,2', template_glycan_tree = connect_tree, template_glycan = myMan9.molecule)
 writePDB('man6.pdb', man6)
+
+
+#extend man6 to man8
+myMan6 = GL.Molecule('man6')
+myMan6.read_molecule_from_PDB('man6.pdb')
+myGlycosylator.assign_patches(myMan6)
+
+connect_tree = myGlycosylator.build_connectivity_tree(myMan6.rootRes, myMan6.interresidue_connectivity)
+man8,bonds8 = myGlycosylator.glycosylate('MAN8_2;4,2', template_glycan_tree = connect_tree, template_glycan = myMan6.molecule)
+writePDB('man8_1.pdb', man8)
+
+
 #Build a man8 ab initio
 man8, bonds8 = myGlycosylator.glycosylate('MAN8_3;3,2')
 writePDB('man8.pdb', man8)
+
+#Rotate man9
+myMan9.define_torsionals()
+myMan9.rotate_bond(8, 60)
+myMan9.rotate_bond(59, 60)
+writePDB('man9_rot.pdb', myMan9.molecule)

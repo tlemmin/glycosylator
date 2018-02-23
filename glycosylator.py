@@ -86,6 +86,28 @@ def pairwise(iterable):
     a = iter(iterable)
     return izip(a, a)
 
+def rotation_matrix(axis, theta):
+    '''Computes the rotation matrix about an arbitrary axis in 3D
+    Code from: http://stackoverflow.com/questions/6802577/python-rotation-of-3d-vector
+    Parameters:
+        axis: axis
+        theta: rotation angle
+    Return: 
+        rotation matrix
+
+    '''
+
+    axis = np.asarray(axis)
+    theta = np.asarray(theta)
+    axis = axis/math.sqrt(np.dot(axis, axis))
+    a = math.cos(theta/2.0)
+    b, c, d = -axis*math.sin(theta/2.0)
+    aa, bb, cc, dd = a*a, b*b, c*c, d*d
+    bc, ad, ac, ab, bd, cd = b*c, a*d, a*c, a*b, b*d, c*d
+    return np.array([[aa+bb-cc-dd, 2*(bc+ad), 2*(bd-ac)],
+                     [2*(bc-ad), aa+cc-bb-dd, 2*(cd+ab)],
+                     [2*(bd+ac), 2*(cd-ab), aa+dd-bb-cc]])
+
 #####################################################################################
 #                                Topology functions                                     #
 #####################################################################################
@@ -441,6 +463,8 @@ class Molecule:
                 self.update_connectivity()
         else:
             print "several chains are present in PDB. Please select only one molecule"
+            return -1
+        return 0
     
     def get_chain(self):
         return self.chain
@@ -643,26 +667,25 @@ class Molecule:
         Parameters:
             hydrogens: include torsional involving terminal hydrogens        
         Initializes:
-            torsionals: a list of serial number of atom defining a trorsional angle (quadruplet) 
+            torsionals: a list of serial number of atom defining a torsional angle (quadruplet) 
         """
         self.torsionals = []
-        cycles = nx.cycle_basis(self.connectivity, self.rootAtom)
+        #cycles = nx.cycle_basis(self.connectivity, self.rootAtom)
         for dihe in self.dihedrals:
-            in_cycle = 0
+            #check that quadruplet is not in cycle
+            if dihe[1] in self.cycle_id and dihe[2] in self.cycle_id:
+                continue
+            
             d_dihe = []
-            for a in dihe:
+            for a in dihe[1:-1]:
                 if a in self.cycle_id:
-                    in_cycle += 1
                     a = self.cycle_id[a]
                 d_dihe.append(a)
 
-            #check that quadruplet is not in cycle
-            if in_cycle > 1:
-                continue
             #check direction of dihedral
-            if self.directed_connectivity.has_edge(d_dihe[1], d_dihe[2]):
+            if self.directed_connectivity.has_edge(d_dihe[0], d_dihe[1]):
                 pass
-            elif self.directed_connectivity.has_edge(d_dihe[2], d_dihe[1]):
+            elif self.directed_connectivity.has_edge(d_dihe[1], d_dihe[0]):
                 dihe.reverse() 
             else:
                 continue
@@ -670,7 +693,7 @@ class Molecule:
             exists = False
             if self.torsionals:
                 for t in self.torsionals:
-                    if dihe[2] == t[2] and dihe[3] == t[3]:
+                    if dihe[1] == t[1] and dihe[2] == t[2]:
                         exists = True
                         break
 
@@ -678,6 +701,46 @@ class Molecule:
                 continue
 
             self.torsionals.append(dihe)
+
+    def rotate_bond(self, torsional, theta):
+        """Rotate the molecule around a torsional angle. Atom affected are in direct graph.
+        Parameters:
+            torsional: index of torsional angle (in torsionals) or list of serial number of atoms defining the torsional angle.
+            theta: amount (degrees) 
+        """
+        
+        if type(torsional) == int:
+            torsional = self.torsionals[torsional]
+        else:
+            if torsional not in torsionals:
+                print "Unknown torsional"
+                return -1
+
+        atoms = []
+        a1 = torsional[-1]
+
+        #check if last atom of torsional angle is in cycle
+        if a1 in self.cycle_id:
+            a1 = self.cycle_id[a1]
+            atoms += a1.split('-')
+        else:
+            atoms.append(str(a1))
+
+        for n in nx.descendants(self.directed_connectivity, a1):
+            if type(n) == str:
+                atoms += n.split('-')
+            else:
+                atoms.append(str(n))
+        sel = self.molecule.select('serial ' + ' '.join(atoms))
+        axis_sel = self.molecule.select('serial ' + ' '.join(map(str, torsional[1:-1])))
+        v1,v2 = axis_sel.getCoords()
+        axis = v2-v1
+        coords = sel.getCoords() - v2
+        M = rotation_matrix(axis, np.deg2rad(theta))
+        coords = M.dot(coords.transpose())
+        sel.setCoords(coords.transpose()+v2)
+
+
 
 #####################################################################################
 #                                Builders                                            #
@@ -1033,9 +1096,6 @@ class MoleculeBuilder:
         wt = [r * cost, r * sint * cosp, r * sint * sinp]
         newc = rjk*wt[0] + cross2*wt[1] + cross*wt[2]
         return a3 + newc
-
-    def add_residue_to_molecule(self, molecule, residue, guess_all_bonds):
-        molecule.add 
     
     def get_bonds(self, residue):
         rn = residue.getRenames()[0]
@@ -1163,7 +1223,9 @@ class Glycosylator:
         if template_glycan_tree and template_glycan:
             inv_template_glycan_tree = {v: k for k, v in template_glycan_tree.items()}
             resid = template_glycan.getResnums()[-1]
-
+            chain = template_glycan.getChids()[0]
+            segname = template_glycan.getSegnames()[0]
+        
         if glycan_name in self.connect_topology:
             glycan_topo = self.get_connectivity_tree(glycan_name)
             sorted_units =  sorted(glycan_topo.keys(), key = len)
@@ -1227,7 +1289,8 @@ class Glycosylator:
             rn,a,p = unit
             #need to add blank at the begining of each key except the root key, which is blank ('')
             if p:
-                key = ' ' + ' '.join(p)
+                #key = ' ' + ' '.join(p)
+                key = ' '.join(p)
             else:
                 key = ''
             glycan_topo[key] = rn
@@ -1259,11 +1322,10 @@ class Glycosylator:
            Returns:
             connect_tree: dictionary of glycan connectivity
         """
-
         paths = nx.shortest_path(G, source = root_id)
         #put root residue in dict
         connect_tree = {}
-        connect_tree[root_id] = ''
+        connect_tree[root_id] = ' '
         
         for n in paths:
             p = paths[n]
@@ -1324,4 +1386,4 @@ class Glycosylator:
         else:
              return ''
 
-     
+
