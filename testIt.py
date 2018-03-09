@@ -52,3 +52,9 @@ myMan9.define_torsionals()
 myMan9.rotate_bond(8, 60)
 myMan9.rotate_bond(59, 60)
 writePDB('man9_rot.pdb', myMan9.molecule)
+
+#Detect clashes
+mySampler = GL.Sampler()
+nbr_count,clashes = mySampler.count_clashes(myMan9)
+print nbr_count, 'clashes were detected: ', clashes
+

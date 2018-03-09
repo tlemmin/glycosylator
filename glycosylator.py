@@ -108,6 +108,7 @@ def rotation_matrix(axis, theta):
                      [2*(bc-ad), aa+cc-bb-dd, 2*(cd+ab)],
                      [2*(bd+ac), 2*(cd-ab), aa+dd-bb-cc]])
 
+
 #####################################################################################
 #                                Topology functions                                     #
 #####################################################################################
@@ -495,7 +496,8 @@ class Molecule:
         self.connectivity.add_edges_from(newbonds)
         self.bonds = self.connectivity.edges()
         self.bonded_uptodate = False
-        
+
+
     def add_residue(self, residue, newbonds, dele_atoms = []):
         """ Add a new residue to a molecule
         Parameters:
@@ -661,6 +663,7 @@ class Molecule:
                 self.interresidue_connectivity.add_node(r1, resname=a1.getResnames()[0])
                 self.interresidue_connectivity.add_node(r2, resname=a2.getResnames()[0])
                 self.interresidue_connectivity.add_edge(r1, r2, patch = '', atoms = a1.getNames()[0] + ':' + a2.getNames()[0])
+                nds
 
     def define_torsionals(self, hydrogens=True):
         """Builds a list with all the torsional angles that can rotate
@@ -996,7 +999,7 @@ class MoleculeBuilder:
             segn, chid, resi, atom_name = a
             sel.append('(segment %s and chain %s and resid %s and name %s)' % (segn, chid, resi, atom_name ))
         sel = 'not (' + ' or '.join(sel) + ')'
-        aa = molecule.select(sel).copy()
+        
         return  molecule.select(sel).copy()
 
     def build_from_DUMMY(self, resid, resname, chain, segname, dummy_patch, dummy_coords = [[0, 0, 0], [0, 0, 1], [0, 1, 1]]):
@@ -1211,7 +1214,7 @@ class Glycosylator:
             glycan: structure of the glycan (AtomGroup)
         """
         #if kwargs is not None:
-        #    for key, value in kwargs.iteritems():
+        #    for key, value in kwargs.ashesteritems():
 
         resid = 1
         dummy_patch = 'DUMMY_MAN'
@@ -1380,10 +1383,93 @@ class Glycosylator:
 
 
     def find_patch(self, atom1, atom2):
+        """Finds patch that connects two atoms
+        Currently based only on atom names
+        Parameters:
+            atom1: name of first atom (str)
+            atom2: name of second atom (str)
+        Returns:
+            patch name
+        """
         key = '-'.join(sorted([atom1, atom2]))
         if key in self.builder.Topology.atomnames_to_patch:
             return self.builder.Topology.atomnames_to_patch[key]
         else:
              return ''
 
+class Sampler():
+    """Class to sample conformations, based on a 
+    """
+    
+    def __init__(self):
+        pass
 
+    def inverse_transform(self, data, n_bin = 100):
+        """Computes the inverse transformation allowing to map a uniform distribution of a given
+        distribution
+        Parameters
+            data: samples from distribution
+            n_bin: number of points for grid
+        Return
+            inv_cdf: inverse cumulative distribution function
+        """
+        cum_values = np.zeros(n_bin)
+        pass
+ 
+    def inverse_transform_sampling(data, n_bins=40, n_samples=1000):
+        """
+        From http://www.nehalemlabs.net/prototype/blog/2013/12/16/how-to-do-inverse-transformation-sampling-in-scipy-and-numpy/
+        """
+        hist, bin_edges = np.histogram(data, bins=n_bins, density=True)
+        cum_values = np.zeros(bin_edges.shape)
+        cum_values[1:] = np.cumsum(hist*np.diff(bin_edges))
+        inv_cdf = interpolate.interp1d(cum_values, bin_edges)
+        r = np.random.rand(n_samples)
+        return inv_cdf(r)
+    
+    
+    def multivariate_probablity_distrbution(self, data, n_bin = 100):
+        """Compute a multivariate from a uniformly distributed random numer [0, 1[
+        Computes for 2D and 3D data
+        Parameters
+            data: samples from distribution
+            n_bin: number of points for grid
+        Return
+            inv_cdf:
+        
+        https://math.stackexchange.com/questions/1846949/how-to-generate-multivariate-random-variables-given-probability-distribution
+        """
+        
+        return -1
+
+    def estimate_KDE(self, data, n_bin):
+        """
+        """
+        pass
+
+    def count_clashes(self, molecule, distance = 1.5):
+        """Counts the number of clashes for a molecule
+        Parameters:
+            molecule: Molecule type object
+            distance: cut-off for defining a clash
+        Returns
+            nbr_clashes: the number of clashes
+            clashes: list of clashing atom serial numbers
+        """
+        kd = KDTree(molecule.molecule.getCoords())
+        kd.search(distance)
+        atoms = kd.getIndices()
+        G = molecule.connectivity
+        nbr_clashes = 0
+        clashes = []
+        for a1,a2 in atoms:
+            if not G.has_edge(a1+1, a2+1):
+                nbr_clashes += 1
+                clashes += (a1+1,a2+1)
+        return nbr_clashes,clashes
+
+    def sample_dihedrals(molecule, excluded_dihe = []):
+        """
+        """
+
+        pass
