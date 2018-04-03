@@ -473,16 +473,25 @@ class Molecule:
     def get_segname(self):
         return self.segn
     
-    def get_residue(self, id):
-        s,c,r = id.split(',')
-        sel = 'segment %s and chain %s and resid %s and name %s)' % (s, c, r)
+    def get_residue(self, res_id):
+        """Returns an AtomGroup of given atom id; composed of 'segname,chain,resid,atomName'
+        """
+        s,c,r = res_id.split(',')
+        sel = 'segment %s and chain %s and resid %s' % (s, c, r)
         return self.molecule.select(sel)
         
-    def get_atom(self, id, atom_name):
-        s,c,r = id.split(',')
-        sel = 'segment %s and chain %s and resid %s and name %s)' % (s, c, r, atom_name )
+    def get_atom(self, a_id, atom_name):
+        """Returns an AtomGroup of given atom id; composed of 'segname,chain,resid,atomName'
+        """
+        s,c,r = a_id.split(',')
+        sel = 'segment %s and chain %s and resid %s and name %s' % (s, c, r, atom_name )
         return self.molecule.select(sel)
-        
+
+    def set_atom_type(self, atom_type):
+        """Assignes atom name, type and charge to each atom in the connectivity graph
+        """
+        self.connectivity.add_nodes_from(atom_type.items())
+
     def update_connectivity(self, update_bonds = True):
         """Updates all the connectivity (bond, angles, dihedrals and graphs)
         """
@@ -496,9 +505,12 @@ class Molecule:
     def set_bonds(self, bonds):
         """ Define list of bonds in a molecule
         Parameters:
-            newbonds: list of bonds
-
+            bonds: list of bonds
         """
+        inv_atom = {v: k for k, v in nx.get_node_attributes(self.connectivity, 'id').items()}
+        newbonds = []
+        for b1,b2 in bonds:
+            newbonds.append((inv_atom[b1], inv_atom[b2]))
         self.connectivity = nx.Graph()
         self.connectivity.add_edges_from(newbonds)
         self.bonds = self.connectivity.edges()
@@ -831,9 +843,9 @@ class MoleculeBuilder:
         bonds = []
         top_bonds = self.Topology.get_bonds(resname)
 
-        id = '%s,%s,%d,' % (segn,chid,resid)
+        id_r = '%s,%s,%d,' % (segname,chain,resid)
         for a1,a2 in pairwise(top_bonds):
-            bonds.append((id+a1, id+a2))
+            bonds.append((id_r+a1, id_r+a2))
 
         return residue, atoms_name, bonds
 
@@ -844,19 +856,19 @@ class MoleculeBuilder:
             dst_atom: copy atom
         """
         dst_atom.setCoords(src_atom.getCoords())
-        dst_atom.setNames(src_atom.getName())
-        dst_atom.setResnums(src_atom.getResnum())
-        dst_atom.setResnames(src_atom.getResname())
-        dst_atom.setChids(src_atom.getChid())
-        dst_atom.setSegnames(src_atom.getSegname())
-        dst_atom.setOccupancies(src_atom.getOccupancy())
-        dst_atom.setBetas(src_atom.getBeta())
-        dst_atom.setSerials(src_atom.getSerial())
-        dst_atom.setIcodes(src_atom.getIcode())
-        dst_atom.setElements(src_atom.getElement())
-        dst_atom.setAltlocs(src_atom.getAltloc())
+        dst_atom.setNames(src_atom.getNames())
+        dst_atom.setResnums(src_atom.getResnums())
+        dst_atom.setResnames(src_atom.getResnames())
+        dst_atom.setChids(src_atom.getChids())
+        dst_atom.setSegnames(src_atom.getSegnames())
+        dst_atom.setOccupancies(src_atom.getOccupancies())
+        dst_atom.setBetas(src_atom.getBetas())
+        dst_atom.setSerials(src_atom.getSerials())
+        dst_atom.setIcodes(src_atom.getIcodes())
+        dst_atom.setElements(src_atom.getElements())
+        dst_atom.setAltlocs(src_atom.getAltlocs())
         
-    def add_missing_atoms(self, residue):
+    def add_missing_atoms(self, residue, resid = None):
         """Add all missing atoms to a ProDy residue from topology
         Parameters:
             residue: ProDy residue (AtomGroup)
@@ -865,19 +877,35 @@ class MoleculeBuilder:
             missing_atoms: list of missing atom names
             bonds: list of new bonds
         """
-        complete_residue,atoms,bonds = self.init_new_residue(residue.getResnum(), residue.getResname(), residue.getChid(), residue.getSegname())
+        if not resid:
+            resid = residue.getResnums()[0]
+        complete_residue,atoms,bonds = self.init_new_residue(resid, residue.getResnames()[0], residue.getChids()[0], residue.getSegnames()[0])
         missing_atoms = []
         atoms_in_residue = residue.getNames()
         for a in atoms:
             if a in atoms_in_residue:
-                atom = residue.getAtom(a)
+                atom = residue.select('name ' + a)
                 catom = complete_residue.select('name ' + a)
                 self.copy_atom(atom, catom)
             else:
                 missing_atoms.append(a)
-        
+        complete_residue.setResnums([resid]*len(complete_residue)) 
         return complete_residue, missing_atoms, bonds
 
+    def apply_patch(self, patch,  residue1, residue2):
+        """
+        Parameters:
+            patch: name of patch (str) 
+            residue1: first residue in patch (ProDy AtomGroup)
+            residue2: second residue in patch (ProDy AtomGroup)
+        Return:
+            bonds: list of all new bonds
+            dele_atoms: list of atoms which should be deleted
+        """
+        
+        dele_atoms = self.dele_atoms(patch, residue1, residue2)
+        bonds = self.patch_bonds(patch, residue1, residue2)
+        return dele_atoms,bonds
 
     def build_IC_graph(self, atoms, ics):
         """Extracts ICs to build missing atoms
@@ -931,9 +959,9 @@ class MoleculeBuilder:
         missing_atoms = [a for a in missing_atoms if '2' + a not in patch_atoms]
         ics = self.Topology.topology[resname]['IC']
         self.build_missing_atom_coord(denovo_residue, missing_atoms, ics)
-        
-        dele_atoms = self.dele_atoms(patch, link_residue, denovo_residue)
-        bonds.extend(self.patch_bonds(patch, link_residue, denovo_residue))
+
+        dele_atoms,b =  self.apply_patch(patch, link_residue, denovo_residue)
+        bonds.extend(b)
         return denovo_residue, dele_atoms, bonds
     
     def patch_bonds(self, patch, residue1, residue2 = None):
@@ -957,10 +985,10 @@ class MoleculeBuilder:
             b = []
             for a in [a1,a2]:
                 if a[0] == '1':
-                    b.append((segn1, chid1, resi1, a[1:]))
+                    b.append('%s,%s,%s,%s'%(segn1, chid1, resi1, a[1:]))
                 if a[0] == '2':
                     if residue2:
-                        b.append((segn2, chid2, resi2, a[1:]))
+                        b.append('%s,%s,%s,%s'%(segn2, chid2, resi2, a[1:]))
                     else:
                         print "Warning BOND: missing residue2 required for patch " + patch
             bonds.append(b)
@@ -988,10 +1016,10 @@ class MoleculeBuilder:
 
         for a in atoms:
             if a[0] == '1':
-                dele_atoms.append((segn1, chid1, resi1, a[1:]))
+                dele_atoms.append('%s,%s,%s,%s'%(segn1, chid1, resi1, a[1:]))
             if a[0] == '2':
                 if residue2:
-                    dele_atoms.append((segn2, chid2, resi2, a[1:]))
+                    dele_atoms.append('%s,%s,%s,%s'%(segn2, chid2, resi2, a[1:]))
                 else:
                     print "Warning: missing residue2 required for patch " + patch
         return dele_atoms
@@ -1004,7 +1032,7 @@ class MoleculeBuilder:
         """
         sel = []
         for a in dele_atoms:
-            segn, chid, resi, atom_name = a
+            segn, chid, resi, atom_name = a.split(',')
             sel.append('(segment %s and chain %s and resid %s and name %s)' % (segn, chid, resi, atom_name ))
         sel = 'not (' + ' or '.join(sel) + ')'
         
@@ -1027,10 +1055,10 @@ class MoleculeBuilder:
         for a in dummy_atoms:
             dummy_residue.select('name ' + a).setCoords([dummy_coords[counter]])
             counter += 1
-        denovo_residue, dele_atoms, bonds_p = self.build_from_patch(dummy_residue, resid, resname, chain, segname, dummy_patch)
+        denovo_residue, dele_atoms, bonds = self.build_from_patch(dummy_residue, resid, resname, chain, segname, dummy_patch)
         del dummy_residue
-        bonds.extend(bonds_p)
-        return denovo_residue, bonds
+        #bonds.extend(bonds_p)
+        return denovo_residue, dele_atoms, bonds
 
     def build_patch_missing_atom_coord(self, link_residue, residue, missing_atoms, ICs):
         """Builds all missing atoms in residue from a patch linking it to link_residue
@@ -1242,38 +1270,52 @@ class Glycosylator:
             sorted_units =  sorted(glycan_topo.keys(), key = len)
             for unit in sorted_units:
                 new_residue = None
+                #here
+                if unit:
+                    lunit = unit.split(' ')
+                    previous = ' '.join(lunit[:-1])
+                else:
+                    lunit = []
+                    previous = ''
+
+                del_atom = []
+
+                #check if residue exists
                 if unit in inv_template_glycan_tree:
                     s,c,r = inv_template_glycan_tree[unit].split(',')
                     sel = '(segment %s) and (chain %s) and (resid %s)' % (s, c, r)
                     sel_residue = template_glycan.select(sel)
                     if sel_residue.getResnames()[0] == glycan_topo[unit]:
-                        #Check else??
-                        built_glycan[unit] = inv_template_glycan_tree[unit]
-                        new_residue = sel_residue.copy()
+                        built_glycan[unit] = ','.join([segname, chain, str(resid)])
+                        #built_glycan[unit] = inv_template_glycan_tree[unit]
+                        new_residue,missing_atoms,bonds = self.builder.add_missing_atoms(sel_residue, resid)
+                        #new_residue.setResnums([resid]*len(new_residue))
+                        ics = self.builder.Topology.topology[glycan_topo[unit]]['IC']
+                        self.builder.build_missing_atom_coord(new_residue, missing_atoms, ics)
                     else:
-                        print 'Oooops in resname'
-                elif not new_residue:
-                    if link_residue and patch:
-                       print 'pass'   
+                        print 'Error in connect tree!! Residue will be build de novo'
+
+                #build first unit form dummy
+                if not lunit and not new_residue:
+                    new_residue, del_atom, bonds = self.builder.build_from_DUMMY(resid, glycan_topo[unit], chain, segname, dummy_patch)
+                elif previous in built_glycan and lunit:
+                    patch = lunit[-1]
+                    s,c,r = built_glycan[previous].split(',')
+                    sel = '(segment %s) and (chain %s) and (resid %s)' % (s, c, r)
+                    previous_residue = glycan.select(sel)
+                    if new_residue:
+                        del_atom, b = self.builder.apply_patch(patch,previous_residue, new_residue)
+                        bonds.extend(b)
                     else:
-                        lunit = unit.split(' ')
-                        previous = ' '.join(lunit[:-1])
-                        #build first unit form dummy
-                        if len(lunit) == 1:
-                            new_residue, bonds = self.builder.build_from_DUMMY(resid, glycan_topo[unit], chain, segname, dummy_patch)
-                            glycan_bonds.extend(bonds)
-                            built_glycan[unit] = ','.join([segname, chain, str(resid)])
-                        elif previous in built_glycan:
-                            patch = lunit[-1]
-                            s,c,r = built_glycan[previous].split(',')
-                            sel = '(segment %s) and (chain %s) and (resid %s)' % (s, c, r)
-                            previous_residue = glycan.select(sel)
-                            new_residue, del_atom, bonds = self.builder.build_from_patch(previous_residue, resid, glycan_topo[unit], chain, segname, patch)                           
-                            built_glycan[unit] = ','.join([segname, chain, str(resid)])
-                            dele_atoms += del_atom
-                            glycan_bonds.extend(bonds)
-                        else:
-                            print 'Oooops in previous'
+                        new_residue, del_atom, bonds = self.builder.build_from_patch(previous_residue, resid, glycan_topo[unit], chain, segname, patch)                           
+                elif lunit:
+                    print 'Error in connect tree!! Glycans will not be builts'
+                    return [], []
+
+                built_glycan[unit] = ','.join([segname, chain, str(resid)])
+                dele_atoms += del_atom
+                glycan_bonds.extend(bonds)
+                
                 if glycan:
                     glycan += new_residue
                 else:
@@ -1287,7 +1329,9 @@ class Glycosylator:
             glycan = self.builder.delete_atoms(glycan, dele_atoms)
             # remove all non existing bonds
             tmp_bonds = []
-            for a1,a2 in pairwise(glycan_bonds):
+#            print 'Bonds',glycan_bonds
+#            print 'delele',dele_atoms
+            for a1,a2 in glycan_bonds:
                 if a1 in dele_atoms or a2 in dele_atoms:
                     continue
                 else:
@@ -1327,7 +1371,7 @@ class Glycosylator:
             a1,a2 = atoms[e].split(':')
             patch = self.find_patch(a1, a2)
             if not patch:
-                print 'Unknown inter residue bond'
+                print 'Unknown inter residue bond', a1, a2
             u,v=e
             G[u][v]['patch'] = patch
         
@@ -1412,26 +1456,59 @@ class Glycosylator:
              return ''
              
     def assign_atom_type(self, molecule, connect_tree=None):
-        """ Returns a dictionary of atom types and bond list for a given molecule
+        """ Returns a dictionary of atom types for a given molecule.
         Parameters:
            molecule: Molecule instance
            connect_tree: connectivity tree generated with "build_connectivity_tree". If not provided will be created in function
         Returns:
            atom_types: dictionary of atom types
-           bonds: list of bonds
         """
         if not connect_tree:
            connect_tree = self.build_connectivity_tree(molecule.rootRes, molecule.interresidue_connectivity)
         inv_connect_tree = {v: k for k, v in connect_tree.items()}
         sorted_units =  sorted(inv_connect_tree.keys(), key = len)
-        
+        atom_type = {}
         for unit in sorted_units:
             current = inv_connect_tree[unit]
             cur_res = molecule.get_residue(current)
+            cur_rn = cur_res.getResnames()[0]
+           
+            cur_atoms = [a.strip() for a in cur_res.getNames()]
+            cur_serial =  cur_res.getSerials()
+            cur_atom_serial = {}
+            for a,s in zip(cur_atoms, cur_serial):
+                cur_atom_serial[a] = s
+            atoms = self.builder.Topology.get_atoms(cur_rn)
+            for a in atoms:
+                an = a[0].strip()
+                if an in cur_atom_serial:
+                    atom_type[cur_atom_serial[an]] = {'name': an, 'type': a[1], 'charge': a[2], 'id': current+','+an}
+            # correct atom type 
             lunit = unit.split(' ')
             patch = lunit[-1]
+            if not patch:
+                continue
             previous = inv_connect_tree[' '.join(lunit[:-1])]
-            pre_res = molecule.get_residue(previous)            
+            pre_res = molecule.get_residue(previous)
+            
+            pre_atoms = [a.strip(' ') for a in pre_res.getNames()]
+            pre_serial =  pre_res.getSerials()
+            pre_atom_serial = {}
+
+            for a,s in zip(pre_atoms, pre_serial):
+                pre_atom_serial[a] = s
+
+            atoms = self.builder.Topology.patches[patch]['ATOM']
+            for a in atoms:
+                an = a[0].strip(' ')
+                if an[0] == '1':
+                    if an[1:] in pre_atom_serial: 
+                        atom_type[pre_atom_serial[an[1:]]] = {'name': an[1:], 'type': a[1], 'charge': a[2], 'id':previous+','+an[1:]}
+                elif an[0] == '2':
+                    if an[1:] in cur_atom_serial:
+                        atom_type[cur_atom_serial[an[1:]]] = {'name': an[1:], 'type': a[1], 'charge': a[2], 'id':current+','+an[1:]}
+        return atom_type
+
     
 class Sampler():
     """Class to sample conformations, based on a 

@@ -10,10 +10,10 @@ r,a,b = myBuilder.add_missing_atoms(myMol.molecule['G'][1])
 myBuilder.build_missing_atom_coord(r, a, myBuilder.Topology.topology['NAG']['IC'])
 writePDB('NAG_complete.pdb', r)
 #Connect a second NAG using a 14 connectivity
-r2, da, b2 = myBuilder.build_from_patch(r, 2, 'NAG', r.getChids()[0], r.getSegnames()[0], '14bb')
+r2, d2, b2 = myBuilder.build_from_patch(r, 2, 'NAG', r.getChids()[0], r.getSegnames()[0], '14bb')
 writePDB('NAG2_complete.pdb', r2)
 #Build a MAN ab initio
-rd, bd = myBuilder.build_from_DUMMY(1, 'MAN', 'G', '1G', 'DUMMY_MAN')
+rd, da, bd = myBuilder.build_from_DUMMY(1, 'MAN', 'G', '1G', 'DUMMY_MAN')
 writePDB('MAN_DUMMY.pdb', rd)
 
 #Load a Man9 molecule
@@ -38,6 +38,7 @@ myMan6 = GL.Molecule('man6')
 myMan6.read_molecule_from_PDB('man6.pdb')
 myGlycosylator.assign_patches(myMan6)
 
+
 connect_tree = myGlycosylator.build_connectivity_tree(myMan6.rootRes, myMan6.interresidue_connectivity)
 man8,bonds8 = myGlycosylator.glycosylate('MAN8_2;4,2', template_glycan_tree = connect_tree, template_glycan = myMan6.molecule)
 writePDB('man8_1.pdb', man8)
@@ -52,6 +53,11 @@ myMan9.define_torsionals()
 myMan9.rotate_bond(8, 60)
 myMan9.rotate_bond(59, 60)
 writePDB('man9_rot.pdb', myMan9.molecule)
+
+
+#Atom type
+atom_type = myGlycosylator.assign_atom_type(myMan6)
+myMan6.set_atom_type(atom_type)
 
 #Detect clashes
 #mySampler = GL.Sampler()
