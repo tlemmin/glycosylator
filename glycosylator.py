@@ -473,9 +473,16 @@ class Molecule:
     def get_segname(self):
         return self.segn
     
-    def get_residue(self, resid):
-        return self.molecule[self.chain][resid]
-
+    def get_residue(self, id):
+        s,c,r = id.split(',')
+        sel = 'segment %s and chain %s and resid %s and name %s)' % (s, c, r)
+        return self.molecule.select(sel)
+        
+    def get_atom(self, id, atom_name):
+        s,c,r = id.split(',')
+        sel = 'segment %s and chain %s and resid %s and name %s)' % (s, c, r, atom_name )
+        return self.molecule.select(sel)
+        
     def update_connectivity(self, update_bonds = True):
         """Updates all the connectivity (bond, angles, dihedrals and graphs)
         """
@@ -663,7 +670,7 @@ class Molecule:
                 self.interresidue_connectivity.add_node(r1, resname=a1.getResnames()[0])
                 self.interresidue_connectivity.add_node(r2, resname=a2.getResnames()[0])
                 self.interresidue_connectivity.add_edge(r1, r2, patch = '', atoms = a1.getNames()[0] + ':' + a2.getNames()[0])
-                nds
+                
 
     def define_torsionals(self, hydrogens=True):
         """Builds a list with all the torsional angles that can rotate
@@ -827,6 +834,7 @@ class MoleculeBuilder:
         id = '%s,%s,%d,' % (segn,chid,resid)
         for a1,a2 in pairwise(top_bonds):
             bonds.append((id+a1, id+a2))
+
         return residue, atoms_name, bonds
 
     def copy_atom(self, src_atom, dst_atom):
@@ -1109,7 +1117,7 @@ class MoleculeBuilder:
             bonds += (i1, i2)
         return bonds
 
-
+    
 #####################################################################################
 #                                Glycosylator                                        #
 #####################################################################################
@@ -1131,7 +1139,7 @@ class Glycosylator:
 
     def read_connectivity_topology(self, connectfile):
         """Parse file defining the topology of connectivity trees.
-	This function will initialize connect_topology and glycan_keys
+    This function will initialize connect_topology and glycan_keys
 
         Each connectivity is defined by
             RESI: name of the polyglycan
@@ -1159,7 +1167,7 @@ class Glycosylator:
                     nbr_units += 1
         residue['#UNIT'] = nbr_units
         self.connect_topology[resname] = copy.copy(residue)
-	self.build_keys()
+        self.build_keys()
 
     def build_keys(self):
         self.glycan_keys = {}
@@ -1239,8 +1247,11 @@ class Glycosylator:
                     sel = '(segment %s) and (chain %s) and (resid %s)' % (s, c, r)
                     sel_residue = template_glycan.select(sel)
                     if sel_residue.getResnames()[0] == glycan_topo[unit]:
+                        #Check else??
                         built_glycan[unit] = inv_template_glycan_tree[unit]
                         new_residue = sel_residue.copy()
+                    else:
+                        print 'Oooops in resname'
                 elif not new_residue:
                     if link_residue and patch:
                        print 'pass'   
@@ -1261,12 +1272,17 @@ class Glycosylator:
                             built_glycan[unit] = ','.join([segname, chain, str(resid)])
                             dele_atoms += del_atom
                             glycan_bonds.extend(bonds)
-
+                        else:
+                            print 'Oooops in previous'
                 if glycan:
                     glycan += new_residue
                 else:
                     glycan = new_residue
                 resid += 1
+        else:
+            print "Unkown Glycan"
+            return [], []
+            
         if dele_atoms:
             glycan = self.builder.delete_atoms(glycan, dele_atoms)
             # remove all non existing bonds
@@ -1298,8 +1314,6 @@ class Glycosylator:
                 key = ''
             glycan_topo[key] = rn
         return glycan_topo
-
-    
 
     def assign_patches(self, molecule):
         """Assignes patch names to each edge of interresidue digraph
@@ -1396,38 +1410,54 @@ class Glycosylator:
             return self.builder.Topology.atomnames_to_patch[key]
         else:
              return ''
-
+             
+    def assign_atom_type(self, molecule, connect_tree=None):
+        """ Returns a dictionary of atom types and bond list for a given molecule
+        Parameters:
+           molecule: Molecule instance
+           connect_tree: connectivity tree generated with "build_connectivity_tree". If not provided will be created in function
+        Returns:
+           atom_types: dictionary of atom types
+           bonds: list of bonds
+        """
+        if not connect_tree:
+           connect_tree = self.build_connectivity_tree(molecule.rootRes, molecule.interresidue_connectivity)
+        inv_connect_tree = {v: k for k, v in connect_tree.items()}
+        sorted_units =  sorted(inv_connect_tree.keys(), key = len)
+        
+        for unit in sorted_units:
+            current = inv_connect_tree[unit]
+            cur_res = molecule.get_residue(current)
+            lunit = unit.split(' ')
+            patch = lunit[-1]
+            previous = inv_connect_tree[' '.join(lunit[:-1])]
+            pre_res = molecule.get_residue(previous)            
+    
 class Sampler():
     """Class to sample conformations, based on a 
     """
     
-    def __init__(self):
-        pass
-
-    def inverse_transform(self, data, n_bin = 100):
-        """Computes the inverse transformation allowing to map a uniform distribution of a given
-        distribution
+    def __init__(self, molecules, envrionment):
+        """ 
         Parameters
-            data: samples from distribution
-            n_bin: number of points for grid
-        Return
-            inv_cdf: inverse cumulative distribution function
+            molecules: list of Molecules instances
+            environment: AtomGroup that will not be samples (e.g. protein, membrane, etc.)
         """
-        cum_values = np.zeros(n_bin)
-        pass
- 
-    def inverse_transform_sampling(data, n_bins=40, n_samples=1000):
-        """
-        From http://www.nehalemlabs.net/prototype/blog/2013/12/16/how-to-do-inverse-transformation-sampling-in-scipy-and-numpy/
-        """
-        hist, bin_edges = np.histogram(data, bins=n_bins, density=True)
-        cum_values = np.zeros(bin_edges.shape)
-        cum_values[1:] = np.cumsum(hist*np.diff(bin_edges))
-        inv_cdf = interpolate.interp1d(cum_values, bin_edges)
-        r = np.random.rand(n_samples)
-        return inv_cdf(r)
-    
-    
+        self.molecules = molecules
+        self.environment = envrionment
+        self.envrionment_on_grid = self.place_on_grid(environment)
+        self.molecules_on_grid = []
+        self.energy = {}
+        
+        for molecule in self.molecules:
+            self.molecule_on_grid.append(self.place_on_grid(molecule))
+            molecule.define_torsionals(hydrogens=False)
+            for dihe in molecule.torsionals:
+                dihe
+                atomtype
+                self.get_parameter()
+                enegry = compute_inv_cum_sum_dihedral(k_list,n_list,d_list)
+        
     def multivariate_probablity_distrbution(self, data, n_bin = 100):
         """Compute a multivariate from a uniformly distributed random numer [0, 1[
         Computes for 2D and 3D data
@@ -1446,9 +1476,66 @@ class Sampler():
         """
         """
         pass
+        
+    def inverse_transform(self, data, n_bin = 100):
+        """Computes the inverse transformation allowing to map a uniform distribution of a given
+        distribution
+        Parameters
+            data: samples from distribution
+            n_bin: number of points for grid
+        Return
+            inv_cdf: inverse cumulative distribution function
+        """
+        cum_values = np.zeros(n_bin)
+        return -1
+ 
+    def inverse_transform_sampling(data, r, n_bins=40, n_samples=1000):
+        """
+        From http://www.nehalemlabs.net/prototype/blog/2013/12/16/how-to-do-inverse-transformation-sampling-in-scipy-and-numpy/
+        """
+        hist, bin_edges = np.histogram(data, bins=n_bins, density=True)
+        cum_values = np.zeros(bin_edges.shape)
+        cum_values[1:] = np.cumsum(hist*np.diff(bin_edges))
+        inv_cdf = interpolate.interp1d(cum_values, bin_edges)
+        return inv_cdf(r)
+        
+    def compute_inv_cum_sum_dihedral(k_list,n_list,d_list, n_points = 100):
+        """Computes the an interpolation of the inverse transform sampling of a CHARMM
+        dihedral term: sum(k*[1-cos(n*phi -d)]).
+        This allows to map a uniform distribution [0:1[ to the dihedral energy distribution
+        Parameters:
+            k_list: list of force constants
+            n_list: list of periodicities
+            d_list: list of phase off-sets
+            n_points: number of points used for computing the energy function
+        Returns:
+            inv_cdf: interpolate object
+        """
+        phi = np.arange(-np.pi, np.pi, n_points)
+        energy = np.zeros(phi.size)
+        for k,n,d in zip(k_list, n_list, d_list):
+            energy += k*(1-cos(n*phi -d))
+        cum_values = np.zeros(bin_edges.shape)
+        cum_values[1:] = np.cumsum(energy*np.diff(phi))
+        inv_cdf = interpolate.interp1d(cum_values, phi)
+        return inv_cdf
+        
+    
+    def count_total_clashes(self, mol_id, distance = 1.5):
+        """Counts the total number of clashes in the system. 
+        Performed in two steps:
+                - count the number of clashes within a molecules (KDTree)
+                - count the number of clashes between the molecule and it's environment (Grid)
+        Parameters:
+            mol_id: id of the molecule
+        """
+        molecule = self.molecules[mol_id]
+        nbr_clashes,clashes = count_self_clashes(molecule)
+        nbr_clashes += count_environment_clashes(mol_id)
 
-    def count_clashes(self, molecule, distance = 1.5):
+    def count_self_clashes(self, molecule, distance = 1.5):
         """Counts the number of clashes for a molecule
+        KDTree based
         Parameters:
             molecule: Molecule type object
             distance: cut-off for defining a clash
@@ -1467,7 +1554,20 @@ class Sampler():
                 nbr_clashes += 1
                 clashes += (a1+1,a2+1)
         return nbr_clashes,clashes
-
+        
+    def count_environment_clashes(self, mol_id):
+        """Counts the number of a molecule and its environment
+        Grid based
+        Parameters:
+            mol_id: id of molecule
+        """
+        #np.intersect instead of matrix comparision??
+    
+    def place_on_grid(self, atoms, grid):
+        """Place list of atoms on a grid
+        """
+        pass
+    
     def sample_dihedrals(molecule, excluded_dihe = []):
         """
         """

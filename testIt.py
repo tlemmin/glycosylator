@@ -23,11 +23,11 @@ myGlycosylator = GL.Glycosylator('./support/toppar_charmm/mannose.rtf', './suppo
 myGlycosylator.builder.Topology.read_topology('./support/topology/DUMMY.top')
 myGlycosylator.read_connectivity_topology('./support/topology/mannose.top')
 
-#identify glycan
+#Identify glycan
 myGlycosylator.assign_patches(myMan9)
-print myGlycosylator.identify_glycan(myMan9)
+print "Identified glycan: ", myGlycosylator.identify_glycan(myMan9)
 
-#trim it down to man6
+#Trim man9 down to man6
 connect_tree = myGlycosylator.build_connectivity_tree(myMan9.rootRes, myMan9.interresidue_connectivity)
 man6, bonds6  = myGlycosylator.glycosylate('MAN6_1;3,2', template_glycan_tree = connect_tree, template_glycan = myMan9.molecule)
 writePDB('man6.pdb', man6)
@@ -54,7 +54,7 @@ myMan9.rotate_bond(59, 60)
 writePDB('man9_rot.pdb', myMan9.molecule)
 
 #Detect clashes
-mySampler = GL.Sampler()
-nbr_count,clashes = mySampler.count_clashes(myMan9)
-print nbr_count, 'clashes were detected: ', clashes
+#mySampler = GL.Sampler()
+#nbr_count,clashes = mySampler.count_clashes(myMan9)
+#print nbr_count, 'clashes were detected: ', clashes
 
