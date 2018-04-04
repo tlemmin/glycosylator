@@ -29,8 +29,8 @@ import numpy as np
 import networkx as nx
 from prody import *
 from itertools import izip
-
-
+from scipy.spatial import distance
+from scipy.interpolate import interp1d
 
 SELF_BIN = os.path.dirname(os.path.realpath(sys.argv[0]))
 #sys.path.insert(0, SELF_BIN + '/support')
@@ -159,7 +159,10 @@ class CHARMMTopology:
         lines = readLinesFromFile(fileIn)
         topo_type=''
         residue={}
-        masses={}
+        if 'MASS' not in self.topology:
+            self.topology['MASS'] = {}
+        masses = self.topology['MASS']
+        
         for line in lines:                                                             # Loop through each line 
             line = line.split('\n')[0].split('!')[0].split() #remove comments and endl
             if line:
@@ -205,7 +208,6 @@ class CHARMMTopology:
             #else:
             #    atomnames_to_patch[key]=[resname]
             self.atomnames_to_patch[key] = resname
-        self.topology['MASS'] = copy.copy(masses)        
 
     def read_mass(self, mass, masses):
         mass[3]=float(mass[3])
@@ -261,9 +263,9 @@ class CHARMMParameters:
     """
     def __init__(self, fileIn):
         self.parameters = {}
-        self.read_parameters
+        self.read_parameters(fileIn)
 
-    def read_parameters(fileIn):
+    def read_parameters(self, fileIn):
         """Reads CHARMM parameter file. 
         Parameters:
             fileIn: path to parameter file
@@ -301,7 +303,7 @@ class CHARMMParameters:
                     prm = {}
                     continue
                 if prm_type:
-                    eval('read_'+prm_type+'(line, prm)')
+                    eval('self.read_'+prm_type+'(line, prm)')
         self.parameters[prm_type] = copy.copy(prm)
 
 
@@ -326,7 +328,7 @@ class CHARMMParameters:
             if key in prm:
                 prm[key].append(map(float, dihe[4:]))
             else:
-                prm[key]=map(float, dihe[4:])
+                prm[key] = [map(float, dihe[4:])]
         else:
             print "Invalid DIHEDRAL: "+' '.join(dihe)
             
@@ -374,7 +376,7 @@ class Molecule:
             segn: segname
             id: glycosylator id
             key: string representation of connectivity
-            molecule: Prody AtomGroup
+            atom_group: Prody AtomGroup
             bonds: list of all bonds
             angles: list of all angles
             dihedrals: list of all dihedrals
@@ -389,7 +391,7 @@ class Molecule:
             chain: chain id (str)
             segn: segname (str)
         Initializes:
-            molecule: AtomGroup 
+            atom_group: AtomGroup 
             rootAtom: serial number of atom used as root for graphs
             bonds: list of all bonds
             angles: list of all angles
@@ -401,7 +403,7 @@ class Molecule:
             bond_length: dictionary of bond distance used to guess bonds. Keys are sorted by alphabetical order
         """
         self.name = name
-        self.molecule = AtomGroup(self.name)
+        self.atom_group = AtomGroup(self.name)
         self.chain = chain
         self.segn = segn
         self.rootAtom = 1
@@ -432,7 +434,7 @@ class Molecule:
             filename: path to PDB file
             selection: selection of a subset of the molecule (str)
         """
-        writePDB(filename, self.molecule.select(selection))
+        writePDB(filename, self.atom_group.select(selection))
 
     def read_molecule_from_PDB(self, filename, rootAtom = 1, update_bonds = True, **kwargs):
         """Initialize molecule from a PDB file
@@ -445,7 +447,7 @@ class Molecule:
                 model: model number (int)
                 chain: chain id (str)
         Initializes:
-            molecule
+            atom_group
             chain: chain id
             segn: segment name
             connectivity: bonds, angles, dihedrals and graph 
@@ -455,18 +457,32 @@ class Molecule:
         segn = set(PDBmolecule.getSegnames())
         self.rootAtom = rootAtom
         if len(chain) == 1 and len(segn) == 1:
-            self.molecule = PDBmolecule
+            self.atom_group = PDBmolecule
             self.chain = chain
             self.segn = segn
-            a1 = self.molecule.select('serial ' + str(self.rootAtom))
-            self.rootRes = a1.getSegnames()[0] + ',' + a1.getChids()[0] + ',' + str(a1.getResnums()[0]) 
+            a1 = self.atom_group.select('serial ' + str(self.rootAtom))
+            self.rootRes = a1.getSegnames()[0] + ',' + a1.getChids()[0] + ',' + str(a1.getResnums()[0])
+
             if update_bonds:
                 self.update_connectivity()
         else:
             print "several chains are present in PDB. Please select only one molecule"
             return -1
         return 0
-    
+
+    def set_id(self):
+        segn = self.atom_group.getSegnames()
+        chid = self.atom_group.getChids()
+        res = self.atom_group.getResnums()
+        at = self.atom_group.getNames()
+        ser = self.atom_group.getSerials()
+        ids = {}
+
+        for i,s,c,r,a in zip(ser,segn,chid,res,at):
+            ids[i] = {'id': ','.join([s,c,str(r),a])}
+        
+        self.connectivity.add_nodes_from(ids.items())
+
     def get_chain(self):
         return self.chain
     
@@ -478,14 +494,14 @@ class Molecule:
         """
         s,c,r = res_id.split(',')
         sel = 'segment %s and chain %s and resid %s' % (s, c, r)
-        return self.molecule.select(sel)
+        return self.atom_group.select(sel)
         
     def get_atom(self, a_id, atom_name):
         """Returns an AtomGroup of given atom id; composed of 'segname,chain,resid,atomName'
         """
         s,c,r = a_id.split(',')
         sel = 'segment %s and chain %s and resid %s and name %s' % (s, c, r, atom_name )
-        return self.molecule.select(sel)
+        return self.atom_group.select(sel)
 
     def set_atom_type(self, atom_type):
         """Assignes atom name, type and charge to each atom in the connectivity graph
@@ -502,20 +518,48 @@ class Molecule:
         self.update_graphs()
         self.bonded_uptodate = True 
 
-    def set_bonds(self, bonds):
+    def set_bonds(self, bonds, update_con = True):
         """ Define list of bonds in a molecule
         Parameters:
             bonds: list of bonds
+            update_con: update the connectivity with these new bonds
         """
         inv_atom = {v: k for k, v in nx.get_node_attributes(self.connectivity, 'id').items()}
         newbonds = []
         for b1,b2 in bonds:
-            newbonds.append((inv_atom[b1], inv_atom[b2]))
+            if b1 in inv_atom and b2 in inv_atom:
+                newbonds.append((inv_atom[b1], inv_atom[b2]))
+            else:
+                print 'Skipping bond', b1,b2
         self.connectivity = nx.Graph()
         self.connectivity.add_edges_from(newbonds)
         self.bonds = self.connectivity.edges()
         self.bonded_uptodate = False
+        if update_con:
+            self.update_connectivity(update_bonds =  False)
 
+    def set_AtomGroup(self, AGmolecule, rootAtom = 1, bonds = None, update_bonds = False):
+        chain = set(AGmolecule.getChids())
+        segn = set(AGmolecule.getSegnames())
+        self.rootAtom = rootAtom
+        if len(chain) == 1 and len(segn) == 1:
+            self.atom_group = AGmolecule
+            self.chain = chain
+            self.segn = segn
+            a1 = self.atom_group.select('serial ' + str(self.rootAtom))
+            self.rootRes = a1.getSegnames()[0] + ',' + a1.getChids()[0] + ',' + str(a1.getResnums()[0]) 
+            
+            if bonds:
+                self.set_id()
+                self.set_bonds(bonds)
+
+            if update_bonds:
+                self.update_connectivity()
+
+        else:
+            print "several chains are present in PDB. Please select only one molecule"
+            return -1
+        return 0
 
     def add_residue(self, residue, newbonds, dele_atoms = []):
         """ Add a new residue to a molecule
@@ -523,17 +567,17 @@ class Molecule:
             residue: proDy AtomGroup
             newbonds: list of bonds to be added
         """
-        if self.molecule.select('resid ' + ri + 'and chain ' + chid):
+        if self.atom_group.select('resid ' + ri + 'and chain ' + chid):
             print 'WARNING! A residue with the same id (resid and chain) already exists. The new residue has not been added'
             return -1
             
         if dele_atoms:
             self.delete_atoms(dele_atoms)
             
-        natoms = self.molecule.numAtoms()
-        self.molecule += residue
-        self.molecule.setTitle(self.name)
-        self.molecule.setSerials(np.arange(natoms)+1)
+        natoms = self.atom_group.numAtoms()
+        self.atom_group += residue
+        self.atom_group.setTitle(self.name)
+        self.atom_group.setSerials(np.arange(natoms)+1)
         
         self.connectivity.add_edges_from(np.array(newbonds) + natoms)
         #self.connectivity.remove_edges_from(delete_bonds)
@@ -555,10 +599,10 @@ class Molecule:
                 elif a < b[1]:
                     b[1] -= 1
                 newbonds.append(b)
-        self.molecule = self.molecule.select('not serial ' + del_atoms.join(' ')).copy()
+        self.atom_group = self.atom_group.select('not serial ' + del_atoms.join(' ')).copy()
         #renumber atoms 
-        self.molecule.setSerial(np.arange(self.molecule.numAtoms()))
-        self.molecule.setTitle(self.name)
+        self.atom_group.setSerial(np.arange(self.atom_group.numAtoms()))
+        self.atom_group.setTitle(self.name)
         self.bonds = newbonds
         self.update_connectivity(self, update_bonds = False)    
 
@@ -568,7 +612,7 @@ class Molecule:
             default_bond_length: maximum distance between two connected heavy atoms (Angstrom), if not present in bond_length dictionary
         """
         self.connectivity = nx.Graph()
-        for a in self.molecule:
+        for a in self.atom_group:
             bonds = []
             sel = ''
             a_elem = a.getElement()
@@ -585,7 +629,7 @@ class Molecule:
             sel = '(' + sel + ') and (not serial ' + str(a.getSerial()) + ')'
             
             # search for all neighboring atoms
-            neighbors =  self.molecule.select(sel)
+            neighbors =  self.atom_group.select(sel)
             if neighbors:
                 for aa in neighbors:
                         bonds.append((a.getSerial(), aa.getSerial()))
@@ -634,7 +678,7 @@ class Molecule:
         """Sets the rootAtom and updates all the directed graph
         """
         self.rootAtom = rootAtom
-        a1 = self.molecule.select('serial ' + str(self.rootAtom))
+        a1 = self.atom_group.select('serial ' + str(self.rootAtom))
         self.rootRes = a1.getSegnames()[0] + ',' + a1.getChids()[0] + ',' + str(a1.getResnums()[0]) 
         self.update_graphs()
 
@@ -664,7 +708,7 @@ class Molecule:
             directed_edge = []
             atoms = []
             for node in edge:
-                atoms.append(self.molecule.select('serial ' + str(node)))
+                atoms.append(self.atom_group.select('serial ' + str(node)))
                 if node in self.cycle_id:
                     key = self.cycle_id[node]
                     if key not in self.directed_connectivity:
@@ -693,6 +737,12 @@ class Molecule:
         """
         self.torsionals = []
         #cycles = nx.cycle_basis(self.connectivity, self.rootAtom)
+        if not hydrogens:
+            elements = nx.get_node_attributes(self.connectivity, 'element')
+            if not elements:
+                print 'Elements have not been defined (use assign_atom_type). Hydrogens cannot be excluded.'
+                hydrogens = True
+        
         for dihe in self.dihedrals:
             #check that quadruplet is not in cycle
             if dihe[1] in self.cycle_id and dihe[2] in self.cycle_id:
@@ -711,6 +761,11 @@ class Molecule:
                 dihe.reverse() 
             else:
                 continue
+
+            #check if hydrogen
+            if not hydrogens:
+                if elements[dihe[0]] == 'H' or elements[dihe[-1]] == 'H':
+                    continue
             #check if already in torsionals list
             exists = False
             if self.torsionals:
@@ -753,8 +808,8 @@ class Molecule:
                 atoms += n.split('-')
             else:
                 atoms.append(str(n))
-        sel = self.molecule.select('serial ' + ' '.join(atoms))
-        axis_sel = self.molecule.select('serial ' + ' '.join(map(str, torsional[1:-1])))
+        sel = self.atom_group.select('serial ' + ' '.join(atoms))
+        axis_sel = self.atom_group.select('serial ' + ' '.join(map(str, torsional[1:-1])))
         v1,v2 = axis_sel.getCoords()
         axis = v2-v1
         coords = sel.getCoords() - v2
@@ -785,7 +840,7 @@ class MoleculeBuilder:
             print "unknown force field."
 
 
-    def init_new_residue(self, resid, resname, chain, segname):
+    def init_new_residue(self, resid, resname, chain, segname, i = 1):
         """Initializes a residue from scratch
         Parameters:
             resid: residue id (int)
@@ -810,7 +865,6 @@ class MoleculeBuilder:
         segn = []
         occupancy = []
         beta = []
-        i = 0
         serial = []
         element = []
         icode = []
@@ -1232,7 +1286,7 @@ class Glycosylator:
         return unsorted_graph
 
 
-    def glycosylate(self, glycan_name, link_residue = None, patch = '', template_glycan_tree = {}, template_glycan = None, chain = 'X', segname = 'G1'):
+    def glycosylate(self, glycan_name, link_residue = None, link_patch = None, template_glycan_tree = {}, template_glycan = None, chain = 'X', segname = 'G1'):
         """Builds a polyglycan from a connectivity tree
         Parameters:
             glycan_name: name of poly glycan
@@ -1240,7 +1294,7 @@ class Glycosylator:
                 segname: segname for new glyan (str)
                 chain: chain for new
                 link_residue: residue to link new glycan (AtomGroup)
-                patch: name of patch (str)
+                link_patch: name of patch (str) which should be used to link glycan
                 template_glycan_tree: dictionary with the identified glycan that should be modified
                                 key: identification of each unit in glycan
                                 value: selection for residue; segname, chain, resid
@@ -1270,7 +1324,6 @@ class Glycosylator:
             sorted_units =  sorted(glycan_topo.keys(), key = len)
             for unit in sorted_units:
                 new_residue = None
-                #here
                 if unit:
                     lunit = unit.split(' ')
                     previous = ' '.join(lunit[:-1])
@@ -1295,9 +1348,12 @@ class Glycosylator:
                     else:
                         print 'Error in connect tree!! Residue will be build de novo'
 
-                #build first unit form dummy
+                #build first unit from DUMMY or from linked residue
                 if not lunit and not new_residue:
-                    new_residue, del_atom, bonds = self.builder.build_from_DUMMY(resid, glycan_topo[unit], chain, segname, dummy_patch)
+                    if link_residue and link_patch:
+                        new_residue, del_atom, bonds = self.builder.build_from_patch(link_residue, resid, glycan_topo[unit], chain, segname, link_patch)
+                    else:
+                        new_residue, del_atom, bonds = self.builder.build_from_DUMMY(resid, glycan_topo[unit], chain, segname, dummy_patch)
                 elif previous in built_glycan and lunit:
                     patch = lunit[-1]
                     s,c,r = built_glycan[previous].split(',')
@@ -1337,6 +1393,11 @@ class Glycosylator:
                 else:
                     tmp_bonds.append((a1, a2))
             glycan_bonds = tmp_bonds
+
+        #set serial number
+        for i in range(len(glycan)):
+            glycan.select('index ' + str(i)).setSerials([i+1])
+
         return glycan, glycan_bonds
 
     def get_connectivity_tree (self, glycan_name):
@@ -1462,12 +1523,15 @@ class Glycosylator:
            connect_tree: connectivity tree generated with "build_connectivity_tree". If not provided will be created in function
         Returns:
            atom_types: dictionary of atom types
+                        key: atom serial number
+                        value: atom name, atom type, charge, id, element
         """
         if not connect_tree:
            connect_tree = self.build_connectivity_tree(molecule.rootRes, molecule.interresidue_connectivity)
         inv_connect_tree = {v: k for k, v in connect_tree.items()}
         sorted_units =  sorted(inv_connect_tree.keys(), key = len)
         atom_type = {}
+        masses = self.builder.Topology.topology['MASS']
         for unit in sorted_units:
             current = inv_connect_tree[unit]
             cur_res = molecule.get_residue(current)
@@ -1482,7 +1546,7 @@ class Glycosylator:
             for a in atoms:
                 an = a[0].strip()
                 if an in cur_atom_serial:
-                    atom_type[cur_atom_serial[an]] = {'name': an, 'type': a[1], 'charge': a[2], 'id': current+','+an}
+                    atom_type[cur_atom_serial[an]] = {'name': an, 'type': a[1], 'charge': a[2], 'id': current+','+an, 'element': masses[a[1]][-1]}
             # correct atom type 
             lunit = unit.split(' ')
             patch = lunit[-1]
@@ -1503,10 +1567,10 @@ class Glycosylator:
                 an = a[0].strip(' ')
                 if an[0] == '1':
                     if an[1:] in pre_atom_serial: 
-                        atom_type[pre_atom_serial[an[1:]]] = {'name': an[1:], 'type': a[1], 'charge': a[2], 'id':previous+','+an[1:]}
+                        atom_type[pre_atom_serial[an[1:]]] = {'name': an[1:], 'type': a[1], 'charge': a[2], 'id':previous+','+an[1:], 'element': masses[a[1]][-1]}
                 elif an[0] == '2':
                     if an[1:] in cur_atom_serial:
-                        atom_type[cur_atom_serial[an[1:]]] = {'name': an[1:], 'type': a[1], 'charge': a[2], 'id':current+','+an[1:]}
+                        atom_type[cur_atom_serial[an[1:]]] = {'name': an[1:], 'type': a[1], 'charge': a[2], 'id':current+','+an[1:], 'element': masses[a[1]][-1]}
         return atom_type
 
     
@@ -1514,91 +1578,74 @@ class Sampler():
     """Class to sample conformations, based on a 
     """
     
-    def __init__(self, molecules, envrionment):
+    def __init__(self, molecules, envrionment, dihe_parameters, clash_dist = 1.5):
         """ 
         Parameters
             molecules: list of Molecules instances
             environment: AtomGroup that will not be samples (e.g. protein, membrane, etc.)
+            dihe_parameters: dictionary of parameters for dihedrals from CHARMMParameters
+            clash_dist = threshold for defining a clash (A)
         """
         self.molecules = molecules
         self.environment = envrionment
-        self.envrionment_on_grid = self.place_on_grid(environment)
-        self.molecules_on_grid = []
+        self.clash_dist = clash_dist 
         self.energy = {}
-        
+        self.energy_lookup = []
         for molecule in self.molecules:
-            self.molecule_on_grid.append(self.place_on_grid(molecule))
-            molecule.define_torsionals(hydrogens=False)
+            types = nx.get_node_attributes(molecule.connectivity, 'type')
+            lookup = []
             for dihe in molecule.torsionals:
-                dihe
-                atomtype
-                self.get_parameter()
-                enegry = compute_inv_cum_sum_dihedral(k_list,n_list,d_list)
-        
-    def multivariate_probablity_distrbution(self, data, n_bin = 100):
-        """Compute a multivariate from a uniformly distributed random numer [0, 1[
-        Computes for 2D and 3D data
-        Parameters
-            data: samples from distribution
-            n_bin: number of points for grid
-        Return
-            inv_cdf:
-        
-        https://math.stackexchange.com/questions/1846949/how-to-generate-multivariate-random-variables-given-probability-distribution
-        """
-        
-        return -1
+                atypes = []
+                for d in dihe:
+                    atypes.append(types[d])
+                k1 = '-'.join(atypes)
+                atypes.reverse()
+                k2 = '-'.join(atypes)
+                if k1 in self.energy:
+                    lookup.append(k1)   
+                    continue
+                if k2 in self.energy:
+                    lookup.append(k2)   
+                    continue
 
-    def estimate_KDE(self, data, n_bin):
-        """
-        """
-        pass
+                if k1 in dihe_parameters:
+                    k = k1
+                elif k2 in dihe_parameters:
+                    k = k2
+                else:
+                    print 'Missing parameters for ' + k1
+                    print 'This dihedral will be skipped'
+                    lookup.append('skip')
+                    continue
+                par_list = dihe_parameters[k]
+                self.energy[k] = self.compute_inv_cum_sum_dihedral(par_list)
+                lookup.append(k)
+            self.energy_lookup.extend(lookup) 
         
-    def inverse_transform(self, data, n_bin = 100):
-        """Computes the inverse transformation allowing to map a uniform distribution of a given
-        distribution
-        Parameters
-            data: samples from distribution
-            n_bin: number of points for grid
-        Return
-            inv_cdf: inverse cumulative distribution function
-        """
-        cum_values = np.zeros(n_bin)
-        return -1
- 
-    def inverse_transform_sampling(data, r, n_bins=40, n_samples=1000):
-        """
-        From http://www.nehalemlabs.net/prototype/blog/2013/12/16/how-to-do-inverse-transformation-sampling-in-scipy-and-numpy/
-        """
-        hist, bin_edges = np.histogram(data, bins=n_bins, density=True)
-        cum_values = np.zeros(bin_edges.shape)
-        cum_values[1:] = np.cumsum(hist*np.diff(bin_edges))
-        inv_cdf = interpolate.interp1d(cum_values, bin_edges)
-        return inv_cdf(r)
-        
-    def compute_inv_cum_sum_dihedral(k_list,n_list,d_list, n_points = 100):
+    def compute_inv_cum_sum_dihedral(self, par_list, n_points = 100):
         """Computes the an interpolation of the inverse transform sampling of a CHARMM
         dihedral term: sum(k*[1-cos(n*phi -d)]).
         This allows to map a uniform distribution [0:1[ to the dihedral energy distribution
         Parameters:
-            k_list: list of force constants
-            n_list: list of periodicities
-            d_list: list of phase off-sets
+            par_list: list of parameters [k, n, d] 
             n_points: number of points used for computing the energy function
         Returns:
             inv_cdf: interpolate object
         """
-        phi = np.arange(-np.pi, np.pi, n_points)
-        energy = np.zeros(phi.size)
-        for k,n,d in zip(k_list, n_list, d_list):
-            energy += k*(1-cos(n*phi -d))
-        cum_values = np.zeros(bin_edges.shape)
-        cum_values[1:] = np.cumsum(energy*np.diff(phi))
-        inv_cdf = interpolate.interp1d(cum_values, phi)
+        phi = np.linspace(-np.pi, np.pi, n_points)
+        energy = np.zeros(phi.shape)
+        for p in par_list:
+            k,n,d = p
+            energy += k*(1-np.cos(n*phi -d))
+        energy = np.max(energy) - energy
+        energy = energy / np.sum(energy[1:]*np.diff(phi))
+        cum_values = np.zeros(energy.shape)
+        cum_values[1:] = np.cumsum(energy[1:]*np.diff(phi))
+        inv_cdf = interp1d(cum_values, phi)
         return inv_cdf
         
     
-    def count_total_clashes(self, mol_id, distance = 1.5):
+    def count_total_clashes(self, mol_id):
         """Counts the total number of clashes in the system. 
         Performed in two steps:
                 - count the number of clashes within a molecules (KDTree)
@@ -1606,11 +1653,10 @@ class Sampler():
         Parameters:
             mol_id: id of the molecule
         """
-        molecule = self.molecules[mol_id]
-        nbr_clashes,clashes = count_self_clashes(molecule)
+        nbr_clashes,clashes = count_self_clashes(mol_id)
         nbr_clashes += count_environment_clashes(mol_id)
 
-    def count_self_clashes(self, molecule, distance = 1.5):
+    def count_self_clashes(self, mol_id, distance = 1.5):
         """Counts the number of clashes for a molecule
         KDTree based
         Parameters:
@@ -1620,8 +1666,9 @@ class Sampler():
             nbr_clashes: the number of clashes
             clashes: list of clashing atom serial numbers
         """
-        kd = KDTree(molecule.molecule.getCoords())
-        kd.search(distance)
+        molecule = self.molecules[mol_id]
+        kd = KDTree(molecule.atom_group.getCoords())
+        kd.search(self.clash_dist)
         atoms = kd.getIndices()
         G = molecule.connectivity
         nbr_clashes = 0
@@ -1634,18 +1681,25 @@ class Sampler():
         
     def count_environment_clashes(self, mol_id):
         """Counts the number of a molecule and its environment
-        Grid based
         Parameters:
             mol_id: id of molecule
         """
-        #np.intersect instead of matrix comparision??
+        XA = self.molecules[mol_id].atom_group.getCoords()
+        nbr_clashes = 0
+        if self.environment:
+            XB = self.environment.getCoords()
+            Y = distance.cdist(XA, XB, 'euclidean')
+            nbr_clashes += np.sum(Y < self.clash_dist)
+
+        for mol in np.arange(len(self.molecules)):
+            if mol == mol_id:
+                continue
+            XB = self.molecules[mol].atom_group.getCoords()
+            Y = distance.cdist(XA, XB, 'euclidean')
+            nbr_clashes += np.sum(Y < self.clash_dist)
+        return nbr_clashes 
     
-    def place_on_grid(self, atoms, grid):
-        """Place list of atoms on a grid
-        """
-        pass
-    
-    def sample_dihedrals(molecule, excluded_dihe = []):
+    def sample_dihedrals(self, molecule, excluded_dihe = []):
         """
         """
 
