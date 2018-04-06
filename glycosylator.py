@@ -539,6 +539,13 @@ class Molecule:
             self.update_connectivity(update_bonds =  False)
 
     def set_AtomGroup(self, AGmolecule, rootAtom = 1, bonds = None, update_bonds = False):
+        """Creates a Molecule instance from AtomGroup. 
+        Parameters:
+            AGmolecule: prody AtomGroup object
+            rootAtom: serial number of rootAtom. Default fist one
+            bonds: list of bonds (e.g. generated with MoleculeBuilder)
+            update_bonds: if bonds have to be guessed.
+        """
         chain = set(AGmolecule.getChids())
         segn = set(AGmolecule.getSegnames())
         self.rootAtom = rootAtom
@@ -557,7 +564,7 @@ class Molecule:
                 self.update_connectivity()
 
         else:
-            print "several chains are present in PDB. Please select only one molecule"
+            print "Several chains are present in AtomGroup. Please select only one molecule"
             return -1
         return 0
 
@@ -717,7 +724,8 @@ class Molecule:
                 else:
                     self.directed_connectivity.add_node(node, iscycle = False, cycle_id = [])
                     directed_edge.append(node)
-                    
+            if directed_edge[0] == directed_edge[1]:
+                continue
             self.directed_connectivity.add_edge(directed_edge[0], directed_edge[1])
             a1,a2 = atoms
             if a1.getResnums()[0] != a2.getResnums()[0]:
@@ -779,11 +787,12 @@ class Molecule:
 
             self.torsionals.append(dihe)
 
-    def rotate_bond(self, torsional, theta):
+    def rotate_bond(self, torsional, theta, absolute =False):
         """Rotate the molecule around a torsional angle. Atom affected are in direct graph.
         Parameters:
             torsional: index of torsional angle (in torsionals) or list of serial number of atoms defining the torsional angle.
-            theta: amount (degrees) 
+            theta: amount (degrees)
+            absolute: theta 
         """
         
         if type(torsional) == int:
@@ -794,7 +803,7 @@ class Molecule:
                 return -1
 
         atoms = []
-        a1 = torsional[-1]
+        a1 = torsional[-2]
 
         #check if last atom of torsional angle is in cycle
         if a1 in self.cycle_id:
@@ -812,11 +821,21 @@ class Molecule:
         axis_sel = self.atom_group.select('serial ' + ' '.join(map(str, torsional[1:-1])))
         v1,v2 = axis_sel.getCoords()
         axis = v2-v1
+        c_angle = 0.
+        if absolute:
+            vec_sel = self.atom_group.select('serial ' + ' '.join(map(str, torsional)))
+            c1,c2,c3,c4 = vec_sel.getCoords()
+            c12 = c1-c2
+            c12 = c12 / np.linalg.norm(c12)
+            c43 = c4-c3
+            c43 = c43 / np.linalg.norm(c43)
+            c_angle = np.rad2deg(np.cos(np.dot(c12,c43)))
+            theta = theta - c_angle
         coords = sel.getCoords() - v2
         M = rotation_matrix(axis, np.deg2rad(theta))
         coords = M.dot(coords.transpose())
         sel.setCoords(coords.transpose()+v2)
-
+        return c_angle
 
 
 #####################################################################################
@@ -1577,7 +1596,6 @@ class Glycosylator:
 class Sampler():
     """Class to sample conformations, based on a 
     """
-    
     def __init__(self, molecules, envrionment, dihe_parameters, clash_dist = 1.5):
         """ 
         Parameters
@@ -1591,9 +1609,12 @@ class Sampler():
         self.clash_dist = clash_dist 
         self.energy = {}
         self.energy_lookup = []
+        self.nbr_clashes = []
+        mol_id =  0
         for molecule in self.molecules:
             types = nx.get_node_attributes(molecule.connectivity, 'type')
             lookup = []
+            self.nbr_clashes.append(self.count_total_clashes(mol_id))
             for dihe in molecule.torsionals:
                 atypes = []
                 for d in dihe:
@@ -1620,7 +1641,8 @@ class Sampler():
                 par_list = dihe_parameters[k]
                 self.energy[k] = self.compute_inv_cum_sum_dihedral(par_list)
                 lookup.append(k)
-            self.energy_lookup.extend(lookup) 
+            self.energy_lookup.append(lookup)
+            mol_id += 1
         
     def compute_inv_cum_sum_dihedral(self, par_list, n_points = 100):
         """Computes the an interpolation of the inverse transform sampling of a CHARMM
@@ -1632,11 +1654,11 @@ class Sampler():
         Returns:
             inv_cdf: interpolate object
         """
-        phi = np.linspace(-np.pi, np.pi, n_points)
+        phi = np.linspace(-180., 180., n_points)
         energy = np.zeros(phi.shape)
         for p in par_list:
             k,n,d = p
-            energy += k*(1-np.cos(n*phi -d))
+            energy += k*(1-np.cos((n*phi -d)*np.pi / 180.))
         energy = np.max(energy) - energy
         energy = energy / np.sum(energy[1:]*np.diff(phi))
         cum_values = np.zeros(energy.shape)
@@ -1653,15 +1675,15 @@ class Sampler():
         Parameters:
             mol_id: id of the molecule
         """
-        nbr_clashes,clashes = count_self_clashes(mol_id)
-        nbr_clashes += count_environment_clashes(mol_id)
+        nbr_clashes,clashes = self.count_self_clashes(mol_id)
+        nbr_clashes += self.count_environment_clashes(mol_id)
+        return nbr_clashes
 
-    def count_self_clashes(self, mol_id, distance = 1.5):
+    def count_self_clashes(self, mol_id):
         """Counts the number of clashes for a molecule
         KDTree based
         Parameters:
             molecule: Molecule type object
-            distance: cut-off for defining a clash
         Returns
             nbr_clashes: the number of clashes
             clashes: list of clashing atom serial numbers
@@ -1699,8 +1721,33 @@ class Sampler():
             nbr_clashes += np.sum(Y < self.clash_dist)
         return nbr_clashes 
     
-    def sample_dihedrals(self, molecule, excluded_dihe = []):
+    def remove_clashes(self, temp = 310, n = 1000):
+        """Monte Carlo sampling to remove clashes
         """
-        """
+        R      = 1.9872156e-3    # Gas constant  kcal/mol/degree
+        beta   = 1 / ( R * temp)
+        
+        i = 0
+        n_mol = len(self.molecules)
+        while i < n:
 
-        pass
+            mol_id = np.random.randint(n_mol)
+            clashes =  self.nbr_clashes[mol_id]
+            torsionals = self.molecules[mol_id].torsionals
+            t_id  = np.random.randint(len(torsionals))
+            lenergy = self.energy_lookup[mol_id][t_id]
+            if lenergy == 'skip':
+                continue
+            i += 1
+            r = np.random.random_sample()
+            theta = self.energy[lenergy](r)
+            ctheta = self.molecules[mol_id].rotate_bond(t_id, theta, absolute = True)
+            clashes_new = self.count_total_clashes(mol_id)
+            if clashes_new >= clashes:
+                if np.exp( -beta *(clashes_new - clashes) ) <  np.random.random_sample():
+                    self.molecules[mol_id].rotate_bond(t_id, ctheta-theta)
+                    continue
+
+            self.nbr_clashes[mol_id] = clashes_new
+            
+            

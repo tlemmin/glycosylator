@@ -67,7 +67,7 @@ Nman8, Nbonds8 = myGlycosylator.glycosylate('MAN8_3;3,2', link_residue=ASN, link
 
 myNman8 = GL.Molecule('N-man8')
 myNman8.set_AtomGroup(Nman8, bonds=Nbonds8)
-myGlycosylator.assign_patches(myMan6)
+myGlycosylator.assign_patches(myNman8)
 atom_type = myGlycosylator.assign_atom_type(myNman8)
 myNman8.set_atom_type(atom_type)
 myNman8.define_torsionals(hydrogens=False)
