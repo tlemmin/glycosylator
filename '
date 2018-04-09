@@ -35,7 +35,6 @@ from scipy.interpolate import interp1d
 from matplotlib.patches import Circle, Rectangle, Polygon
 from matplotlib.collections import PatchCollection
 import matplotlib.pyplot as plt
-import matplotlib.lines as mlines
 
 SELF_BIN = os.path.dirname(os.path.realpath(sys.argv[0]))
 #sys.path.insert(0, SELF_BIN + '/support')
@@ -1308,81 +1307,6 @@ class Glycosylator:
             else:
                 unsorted_graph[gr]=[g]
         return unsorted_graph
-    
-    def readProtein(self, protein):
-        """
-        """
-        self.glyco_protein = protein
-        self.sequence =  self.glyco_protein.select('name CA').getSequence()
-        self.sequons = self.find_sequons(self.glyco_protein.getSegnames()[0], self.glyco_protein.getChids()[0])
-        self.glycans,self.names= self.find_glycans('asd', 'asd')
-
-    def find_sequons(self, segn, chid):
-        """finds all sequon in protein
-        """
-        sequons = {}
-        for m in re.finditer(r'(N[^P][S|T])', self.sequence):
-           sequons[','.join([segn, chid, str(m.start()+1)])] = m.group()
-        return sequons
-    
-    def find_glycans(self, patch, resname):
-        """
-        """
-        sel = self.glyco_protein.select('(not protein and name C1) or (resname ASN and name ND2)')
-        kd = KDTree(sel.getCoords())
-        kd.search(1.7)
-        atoms = kd.getIndices()
-        G = nx.Graph()
-        for a1,a2 in atoms:
-            sel1 = self.glyco_protein.select('index ' + str(a1))
-            sel2 = self.glyco_protein.select('index ' + str(a2))
-            id1,rn1 = self.get_id(sel1)
-            id2,rn2 = self.get_id(sel2)
-
-            if id1 != id2:
-                e = (id1, id2)
-                G.add_edge(*e)
-        names = self.connect_all_glycans(G)
-        glycans = {}
-        print G.nodes()
-        for graph in list(nx.connected_component_subgraphs(G)):
-            print '>', graph.nodes()
-            for node in graph.nodes():
-                if node not in names:
-                    glycans[node] = graph.remove(node)
-        return glycans,names
-
-
-    def connect_all_glycans(self, G):
-        """
-        """
-        sel = self.glyco_protein.select('not protein')
-        print len(sel)
-        kd = KDTree(sel.getCoords())
-        kd.search(1.7)
-        atoms = kd.getIndices()
-        names ={} 
-        for a1,a2 in atoms:
-            print a1,a2
-            sel1 = self.glyco_protein.select('index ' + str(a1))
-            sel2 = self.glyco_protein.select('index ' + str(a2))
-            id1,rn1 = self.get_id(sel1)
-            id2,rn2 = self.get_id(sel2)
-            print rn1,rn2
-            if id1 != id2:
-                e = (id1, id2)
-                G.add_edge(*e)
-                names[id1] = rn1
-                names[id2] = rn2
-
-        return names
-
-    def get_id(self, sel):
-        segn = sel.getSegnames()[0]
-        chid = sel.getChids()[0]
-        res = sel.getResnums()[0]
-        rn = sel.getResnames()[0]
-        return ','.join([segn, chid, str(res)]), rn
 
 
     def glycosylate(self, glycan_name, link_residue = None, link_patch = None, template_glycan_tree = {}, template_glycan = None, chain = 'X', segname = 'G1'):
@@ -1672,7 +1596,6 @@ class Glycosylator:
                         atom_type[cur_atom_serial[an[1:]]] = {'name': an[1:], 'type': a[1], 'charge': a[2], 'id':current+','+an[1:], 'element': masses[a[1]][-1]}
         return atom_type
 
-
 #####################################################################################
 #                                Sampler                                            #
 #####################################################################################
@@ -1867,92 +1790,53 @@ class Drawer():
         self.Symbols['MAN'] = ['circle', 'green']
         self.Symbols['BMA'] = ['circle', 'green']
         self.Symbols['GAL'] = ['circle', 'yellow']
-        self.Symbols['NAG'] = ['square', 'blue']
+        self.Symbols['NAG'] = ['square', 'green']
         self.Symbols['FUC'] = ['triangle', 'red']
 
         self.Colors = {}
-        self.Colors['blue'] = np.array([0, 0, 204])
-        self.Colors['green'] = np.array([0, 204, 0])
-        self.Colors['yellow'] = np.array([255, 255, 102])
-        self.Colors['red'] = np.array([204, 0, 0])
-        self.side = .25
+        self.Colors['blue'] = [204, 0, 0]
+        self.Colors['green'] = [0, 204, 0]
+        self.Colors['yellow'] = [255, 255, 102]
+        self.Colors['red'] = [204, 0, 0]
         
     def get_shape(self, name, pos):
         """Returns a Matplotlib patch 
         """
         pos = np.array(pos)
         if name in self.Symbols:
-            shape,color = self.Symbols[name]
-            color = self.Colors[color]/255.
+            shape = self.Symbols[name][0]
             if shape == 'circle':
-                patch = Circle(pos, self.side)
-                return patch,color
+                return Circle(pos)
             if shape == 'square':
-                return Rectangle(pos-self.side, 2*self.side, 2*self.side),color
+                side = 5.
+                return Rectangle(pos-side/2, side, side)
             if shape == 'triangle':
-                return Polygon([(pos[0]-self.side, pos[1]), (pos[0]+self.side, pos[1]-self.side), (pos[0]+self.side, pos[1]+self.side)]),color
+                side = 2.5
+                return Polygon([(pos[0]-side, pos[1]), (pos[0]+side, pos[1]-side), (pos[0]+side, pos[1]+side)])
 
 
-    def draw_protein(self, length, sequons, pos = [0, 0], color = [.7, .7, .7], ax = None):
+    def get_color(self, name):
         """
-        Parameters:
-            length: length of the protien
-            sequons: position of sequons
-        Returns:
-            ax: 
         """
-        if not ax:
-            fig, ax = plt.subplots()
+        return self.Colors[self.Symbols[name][1]]
 
-        protein = Rectangle(np.array(pos), length, 2*self.side)
-        patch.append(protein)
-        colors.append(color)
-        for seq in sequons:
-            patch.append(Rectangle([pos[0]+seq, pos[1]], 2*self.side, 2*self.side)) 
-            colors.append([.5, .5, .5])
-        p.set_edgecolors([.2, .2, .2])
-        p.set_linewidth(2)
-        p.set_facecolors(colors)
-        ax.add_collection(p)
-        
-        return ax
-
-    def draw_all_trees(self, trees, roots, names, root_pos, ax = None):
+    def draw_trees(self, tree, root, names, root_pos = [0, 0]):
         """
         """
-        if not ax:
-            fig, ax = plt.subplots()
-        direction = 1
-        for tree, root, name, r_pos in zip(trees, roots, names, root_pos):
-            self.draw_tree(tree, root, name, r_pos, direction = direction, ax= ax)
-            direction *= -1
-        return ax
-
-    def draw_tree(self, tree, root, names, root_pos = [0, 0], direction = 1, ax = None):
-        """
-        """
-        if not ax:
-            fig, ax = plt.subplots()
-
-        pos = self.compute_positions(tree, root, root_pos, direction)
-        #draw edges
-        for edge in tree.edges():
-            x1,y1 = pos[edge[0]]
-            x2,y2 = pos[edge[1]]
-            ax.add_line(mlines.Line2D([x1, x2],[y1, y2], lw=2., c=[.2, .2, .2]))
+        pos = self.compute_positions(tree, root, root_pos)
         #draw nodes
         patches = []
         colors = []
         for node in tree.nodes():
-            patch,color = self.get_shape(names[node], pos[node])
-            patches.append(patch)
-            colors.append(color)
-        p = PatchCollection(patches, zorder = 3) 
-        p.set_edgecolors([.2, .2, .2])
-        p.set_linewidth(2)
-        p.set_facecolors(colors)
+            patches.append(self.get_shape(names[node], pos[node]))
+            colors.append(self.get_color(names[node]))
+        print len(patches)
+        p = PatchCollection(patches)
+#        p.set_array(np.array(colors))
+        fig, ax = plt.subplots()
         ax.add_collection(p)
-        return ax
+#        fig.colorbar(p, ax=ax)
+        plt.show()
 
     def compute_positions(self, tree, root, root_pos = [0, 0], direction = 1 ):
         """Computes positions of vertices for drawing a tree
