@@ -1315,41 +1315,57 @@ class Glycosylator:
         self.glyco_protein = protein
         self.sequence =  self.glyco_protein.select('name CA').getSequence()
         self.sequons = self.find_sequons(self.glyco_protein.getSegnames()[0], self.glyco_protein.getChids()[0])
-        self.glycans,self.names= self.find_glycans('asd', 'asd')
+        self.glycans,self.names = self.find_glycans('NGLB', 'ASN')
+    
+    def get_start_resnum(self):
+        return self.glyco_protein.select('name CA').getResnums()[0]
 
     def find_sequons(self, segn, chid):
         """finds all sequon in protein
         """
         sequons = {}
+        sel = self.glyco_protein.select('name CA') 
+        res = sel.getResnums()
+        icodes = sel.getIcodes()
+
         for m in re.finditer(r'(N[^P][S|T])', self.sequence):
-           sequons[','.join([segn, chid, str(m.start()+1)])] = m.group()
+           sequons[','.join([segn, chid, str(res[m.start()]), icodes[m.start()]])] = m.group()
         return sequons
     
     def find_glycans(self, patch, resname):
         """
         """
-        sel = self.glyco_protein.select('(not protein and name C1) or (resname ASN and name ND2)')
+        at = self.builder.Topology.patches[patch]['BOND'][0:2]
+        for a in at:
+            if a[0] == '1':
+                a1 = a[1:]
+            else:
+                a2 = a[1:]
+        #a2 is assumed to be the glycan atoms and a1 from protein
+        sel = self.glyco_protein.select('(not protein and name %s) or (resname %s and name %s)' % (a2,resname,a1))
         kd = KDTree(sel.getCoords())
         kd.search(1.7)
         atoms = kd.getIndices()
         G = nx.Graph()
+        ids,rn = self.get_ids(sel) 
         for a1,a2 in atoms:
-            sel1 = self.glyco_protein.select('index ' + str(a1))
-            sel2 = self.glyco_protein.select('index ' + str(a2))
-            id1,rn1 = self.get_id(sel1)
-            id2,rn2 = self.get_id(sel2)
+            id1 = ids[a1]
+            rn1 = rn[a1]
+            id2 = ids[a2]
+            rn2 = rn[a2]
 
             if id1 != id2:
                 e = (id1, id2)
                 G.add_edge(*e)
         names = self.connect_all_glycans(G)
         glycans = {}
-        print G.nodes()
         for graph in list(nx.connected_component_subgraphs(G)):
-            print '>', graph.nodes()
             for node in graph.nodes():
                 if node not in names:
-                    glycans[node] = graph.remove(node)
+                    root_glycan = list(graph.neighbors(node))[0] 
+                    graph.remove_node(node)
+                    glycans[node] = [root_glycan, graph]
+                    break
         return glycans,names
 
 
@@ -1357,18 +1373,23 @@ class Glycosylator:
         """
         """
         sel = self.glyco_protein.select('not protein')
-        print len(sel)
         kd = KDTree(sel.getCoords())
         kd.search(1.7)
         atoms = kd.getIndices()
-        names ={} 
+        names = {} 
+        ids,rn = self.get_ids(sel)
+
         for a1,a2 in atoms:
-            print a1,a2
-            sel1 = self.glyco_protein.select('index ' + str(a1))
-            sel2 = self.glyco_protein.select('index ' + str(a2))
-            id1,rn1 = self.get_id(sel1)
-            id2,rn2 = self.get_id(sel2)
-            print rn1,rn2
+            id1 = ids[a1]
+            rn1 = rn[a1]
+            id2 = ids[a2]
+            rn2 = rn[a2]
+            if id1 in G and id1 not in names:
+                names[id1] = rn1
+
+            if id2 in G and id2 not in names:
+                names[id2] = rn2
+
             if id1 != id2:
                 e = (id1, id2)
                 G.add_edge(*e)
@@ -1377,12 +1398,24 @@ class Glycosylator:
 
         return names
 
+    def get_ids(self, sel):
+        segn = sel.getSegnames()
+        chid = sel.getChids()
+        res = sel.getResnums()
+        ic = sel.getIcodes()
+        rn = sel.getResnames()
+        ids = []
+        for s,c,r,i in zip(segn,chid,res,ic):
+            ids.append(','.join([s, c, str(r), i]))
+        return ids,rn
+
     def get_id(self, sel):
         segn = sel.getSegnames()[0]
         chid = sel.getChids()[0]
         res = sel.getResnums()[0]
+        ic = sel.getIcodes()[0]
         rn = sel.getResnames()[0]
-        return ','.join([segn, chid, str(res)]), rn
+        return ','.join([segn, chid, str(res), ic]), rn
 
 
     def glycosylate(self, glycan_name, link_residue = None, link_patch = None, template_glycan_tree = {}, template_glycan = None, chain = 'X', segname = 'G1'):
@@ -1876,7 +1909,8 @@ class Drawer():
         self.Colors['yellow'] = np.array([255, 255, 102])
         self.Colors['red'] = np.array([204, 0, 0])
         self.side = .25
-        
+        self.scaling = 10
+
     def get_shape(self, name, pos):
         """Returns a Matplotlib patch 
         """
@@ -1893,23 +1927,33 @@ class Drawer():
                 return Polygon([(pos[0]-self.side, pos[1]), (pos[0]+self.side, pos[1]-self.side), (pos[0]+self.side, pos[1]+self.side)]),color
 
 
-    def draw_protein(self, length, sequons, pos = [0, 0], color = [.7, .7, .7], ax = None):
+    def draw_protein(self, length, start_resid, sequons, pos = [0, 0], color = [.7, .7, .7], ax = None):
         """
         Parameters:
-            length: length of the protien
+            length: length of the protein
+            start_resid: Index of frist residue
             sequons: position of sequons
+            pos: starting position of sequence
+            color: color of protein
         Returns:
-            ax: 
+            ax: axis of plot
         """
         if not ax:
             fig, ax = plt.subplots()
-
-        protein = Rectangle(np.array(pos), length, 2*self.side)
-        patch.append(protein)
+        protein = Rectangle(np.array(pos) - self.side, length/self.scaling, 2*self.side)
+        patches = []
+        colors = []
+        patches.append(protein)
         colors.append(color)
         for seq in sequons:
-            patch.append(Rectangle([pos[0]+seq, pos[1]], 2*self.side, 2*self.side)) 
+            s,c,r,i = seq.split(',')
+            r = (int(r)-start_resid)/self.scaling
+            if i:
+                r += ord(i)-96 
+            patches.append(Rectangle(np.array([pos[0]+r, pos[1]]) - self.side, 2*self.side, 2*self.side)) 
             colors.append([.5, .5, .5])
+
+        p = PatchCollection(patches, zorder = 3) 
         p.set_edgecolors([.2, .2, .2])
         p.set_linewidth(2)
         p.set_facecolors(colors)
@@ -1917,19 +1961,42 @@ class Drawer():
         
         return ax
 
-    def draw_all_trees(self, trees, roots, names, root_pos, ax = None):
-        """
+    def draw_all_trees(self, trees, start_resid, names, ax = None):
+        """Draws all glycans in a protein
+        Parameters:
+            trees: dictionary with sequon as key and list of root and glycan graph as value
+            start_resid: first residue number of protein sequence
+            names: dictionary with glycan nodes as keys and resnames as values
+            ax: axis handle
+        Returns:
+            ax: axis of plot
         """
         if not ax:
             fig, ax = plt.subplots()
         direction = 1
-        for tree, root, name, r_pos in zip(trees, roots, names, root_pos):
-            self.draw_tree(tree, root, name, r_pos, direction = direction, ax= ax)
+        for k in trees.keys():
+            s,c,r,i = k.split(',')
+            r_pos = [(int(r)-start_resid)/self.scaling, direction*self.side*2]
+            if i:
+                r_pos[0] += ord(i)-96
+            root, tree =  trees[k]
+            self.draw_tree(tree, root, names, r_pos, direction = direction, ax= ax)
             direction *= -1
+
+        plt.axis('equal')
         return ax
 
     def draw_tree(self, tree, root, names, root_pos = [0, 0], direction = 1, ax = None):
-        """
+        """Draws a tree representation of a glycan
+        Parameters:
+            tree: netwrokX graph representation of glycan
+            root: name of root node
+            names: dictionary with nodes as keys and resnames as values
+            root_pos: position of the root node (default [0,0])
+            direction: direction for drawing glycan: 1 positive y; -1 negative y
+            ax: axis handle
+         Returns:
+            ax: axis of plot
         """
         if not ax:
             fig, ax = plt.subplots()
@@ -1952,6 +2019,7 @@ class Drawer():
         p.set_linewidth(2)
         p.set_facecolors(colors)
         ax.add_collection(p)
+
         return ax
 
     def compute_positions(self, tree, root, root_pos = [0, 0], direction = 1 ):
