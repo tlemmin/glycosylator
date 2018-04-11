@@ -1,4 +1,4 @@
-REMARK AtomGroup NAG1 + NAG2 + BMA3 + MAN4 + MAN5 + MAN6 + MAN7 + MAN8 + MAN9 + MAN10 Selection 'not ((segment D...0 and name O1))'
+REMARK AtomGroup NAG1 + NAG2 + BMA3 + MAN4 + MAN5 + MAN6 + MAN7 + MAN8 + MAN9 + MAN10 Selection 'not (segment DU...10 and name O1)'
 HETATM    1  C1  NAG X   1      -0.000   1.700   2.212  1.00  0.00        G1 C
 HETATM    2  H1  NAG X   1       0.063   0.928   2.980  1.00  0.00        G1 H
 HETATM    3  O1  NAG X   1      -0.239   1.091   0.941  1.00  0.00        G1 O

@@ -113,6 +113,18 @@ def rotation_matrix(axis, theta):
                      [2*(bc-ad), aa+cc-bb-dd, 2*(cd+ab)],
                      [2*(bd+ac), 2*(cd-ab), aa+dd-bb-cc]])
 
+    
+def alphanum_sort(l):
+    """Alphanumerical sort of a list from
+    https://arcpy.wordpress.com/2012/05/11/sorting-alphanumeric-strings-in-python/
+    Parameter:
+        l: list
+    Returns:
+        alphanumerically sorted list
+    """
+    convert = lambda text: int(text) if text.isdigit() else text
+    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
+    return sorted(l, key = alphanum_key)
 
 #####################################################################################
 #                                Topology functions                                     #
@@ -412,7 +424,7 @@ class Molecule:
         self.chain = chain
         self.segn = segn
         self.rootAtom = 1
-        self.rootAtom = ','.join([segn, chain, 'O']) 
+        self.rootAtom = ','.join([segn, chain, 'O',]) 
         self.bonds = []
         self.angles = []
         self.dihedrals = []
@@ -423,6 +435,7 @@ class Molecule:
         self.torsionals = []
         self.bonded_uptodate = False
 
+        self.prefix = ['segment', 'chain', 'resid', 'icode']
         #Defines distance for bond length between different element used in guess_bonds()
         self.elements = ['C', 'H', 'N', 'O']
         self.bond_length = {}
@@ -466,8 +479,7 @@ class Molecule:
             self.chain = chain
             self.segn = segn
             a1 = self.atom_group.select('serial ' + str(self.rootAtom))
-            self.rootRes = a1.getSegnames()[0] + ',' + a1.getChids()[0] + ',' + str(a1.getResnums()[0])
-
+            self.rootRes = a1.getSegnames()[0] + ',' + a1.getChids()[0] + ',' + str(a1.getResnums()[0])+ ',' + a1.getIcodes()[0]
             if update_bonds:
                 self.update_connectivity()
         else:
@@ -479,12 +491,13 @@ class Molecule:
         segn = self.atom_group.getSegnames()
         chid = self.atom_group.getChids()
         res = self.atom_group.getResnums()
+        ics = self.atom_group.getIcodes()
         at = self.atom_group.getNames()
         ser = self.atom_group.getSerials()
         ids = {}
 
-        for i,s,c,r,a in zip(ser,segn,chid,res,at):
-            ids[i] = {'id': ','.join([s,c,str(r),a])}
+        for i,s,c,r,ic,a in zip(ser,segn,chid,res,ics,at):
+            ids[i] = {'id': ','.join([s,c,str(r),ic,a])}
         
         self.connectivity.add_nodes_from(ids.items())
 
@@ -495,17 +508,24 @@ class Molecule:
         return self.segn
     
     def get_residue(self, res_id):
-        """Returns an AtomGroup of given atom id; composed of 'segname,chain,resid,atomName'
+        """Returns an AtomGroup of given atom id; composed of 'segname,chain,resid,icode,atomName'
         """
-        s,c,r = res_id.split(',')
-        sel = 'segment %s and chain %s and resid %s' % (s, c, r)
+        
+        sel = []
+        for p,s in zip(self.prefix, res_id.split(',')):
+            if s:
+                sel .append(p + ' ' + s)
+        sel = ' and '.join(sel)
         return self.atom_group.select(sel)
         
     def get_atom(self, a_id, atom_name):
-        """Returns an AtomGroup of given atom id; composed of 'segname,chain,resid,atomName'
+        """Returns an AtomGroup of given atom id; composed of 'segname,chain,resid,icode'
         """
-        s,c,r = a_id.split(',')
-        sel = 'segment %s and chain %s and resid %s and name %s' % (s, c, r, atom_name )
+        for p,s in zip(self.prefix, a_id.split(',')):
+            if s:
+                sel .append(p + ' ' + s)
+        sel = ' and '.join(sel)
+        sel += ' and name ' + atom_name
         return self.atom_group.select(sel)
 
     def set_atom_type(self, atom_type):
@@ -559,7 +579,7 @@ class Molecule:
             self.chain = chain
             self.segn = segn
             a1 = self.atom_group.select('serial ' + str(self.rootAtom))
-            self.rootRes = a1.getSegnames()[0] + ',' + a1.getChids()[0] + ',' + str(a1.getResnums()[0]) 
+            self.rootRes = a1.getSegnames()[0] + ',' + a1.getChids()[0] + ',' + str(a1.getResnums()[0]) + ',' + a1.getIcodes()[0]
             
             if bonds:
                 self.set_id()
@@ -691,7 +711,7 @@ class Molecule:
         """
         self.rootAtom = rootAtom
         a1 = self.atom_group.select('serial ' + str(self.rootAtom))
-        self.rootRes = a1.getSegnames()[0] + ',' + a1.getChids()[0] + ',' + str(a1.getResnums()[0]) 
+        self.rootRes = a1.getSegnames()[0] + ',' + a1.getChids()[0] + ',' + str(a1.getResnums()[0] + ',' + a1.getIcodes()[0]) 
         self.update_graphs()
 
     def update_graphs(self):
@@ -734,8 +754,8 @@ class Molecule:
             self.directed_connectivity.add_edge(directed_edge[0], directed_edge[1])
             a1,a2 = atoms
             if a1.getResnums()[0] != a2.getResnums()[0]:
-                r1 = a1.getSegnames()[0] + ',' + a1.getChids()[0] + ',' + str(a1.getResnums()[0])
-                r2 = a2.getSegnames()[0] + ',' + a2.getChids()[0] + ',' + str(a2.getResnums()[0])
+                r1 = a1.getSegnames()[0] + ',' + a1.getChids()[0] + ',' + str(a1.getResnums()[0]) + ',' + a1.getIcodes()[0]
+                r2 = a2.getSegnames()[0] + ',' + a2.getChids()[0] + ',' + str(a2.getResnums()[0]) + ',' + a2.getIcodes()[0]
                 self.interresidue_connectivity.add_node(r1, resname=a1.getResnames()[0])
                 self.interresidue_connectivity.add_node(r2, resname=a2.getResnames()[0])
                 self.interresidue_connectivity.add_edge(r1, r2, patch = '', atoms = a1.getNames()[0] + ':' + a2.getNames()[0])
@@ -921,7 +941,7 @@ class MoleculeBuilder:
         bonds = []
         top_bonds = self.Topology.get_bonds(resname)
 
-        id_r = '%s,%s,%d,' % (segname,chain,resid)
+        id_r = '%s,%s,%d,,' % (segname,chain,resid)
         for a1,a2 in pairwise(top_bonds):
             bonds.append((id_r+a1, id_r+a2))
 
@@ -1055,18 +1075,20 @@ class MoleculeBuilder:
         segn1 = residue1.getSegnames()[0] 
         chid1 = residue1.getChids()[0]
         resi1 = str(residue1.getResnums()[0])
+        ic1 = str(residue1.getIcodes()[0])
         if residue2:
             segn2 = residue2.getSegnames()[0] 
             chid2 = residue2.getChids()[0]
             resi2 = str(residue2.getResnums()[0])
+            ic2 = str(residue2.getIcodes()[0])
         for a1,a2 in pairwise(self.Topology.patches[patch]['BOND']):
             b = []
             for a in [a1,a2]:
                 if a[0] == '1':
-                    b.append('%s,%s,%s,%s'%(segn1, chid1, resi1, a[1:]))
+                    b.append('%s,%s,%s,%s,%s'%(segn1, chid1, resi1, ic1, a[1:]))
                 if a[0] == '2':
                     if residue2:
-                        b.append('%s,%s,%s,%s'%(segn2, chid2, resi2, a[1:]))
+                        b.append('%s,%s,%s,%s,%s'%(segn2, chid2, resi2, ic2, a[1:]))
                     else:
                         print "Warning BOND: missing residue2 required for patch " + patch
             bonds.append(b)
@@ -1087,17 +1109,19 @@ class MoleculeBuilder:
         segn1 = residue1.getSegnames()[0] 
         chid1 = residue1.getChids()[0]
         resi1 = str(residue1.getResnums()[0])
+        ic1 = str(residue1.getIcodes()[0])
         if residue2:
             segn2 = residue2.getSegnames()[0] 
             chid2 = residue2.getChids()[0]
             resi2 = str(residue2.getResnums()[0])
+            ic2 = str(residue2.getIcodes()[0])
 
         for a in atoms:
             if a[0] == '1':
-                dele_atoms.append('%s,%s,%s,%s'%(segn1, chid1, resi1, a[1:]))
+                dele_atoms.append('%s,%s,%s,%s,%s'%(segn1, chid1, resi1, ic1, a[1:]))
             if a[0] == '2':
                 if residue2:
-                    dele_atoms.append('%s,%s,%s,%s'%(segn2, chid2, resi2, a[1:]))
+                    dele_atoms.append('%s,%s,%s,%s,%s'%(segn2, chid2, resi2, ic2, a[1:]))
                 else:
                     print "Warning: missing residue2 required for patch " + patch
         return dele_atoms
@@ -1109,9 +1133,14 @@ class MoleculeBuilder:
             dele_atoms: list of atoms to be deleted. (segn, chid, resi, atom_name)
         """
         sel = []
+        prefix = ['segment', 'chain', 'resid', 'icode', 'name']
         for a in dele_atoms:
-            segn, chid, resi, atom_name = a.split(',')
-            sel.append('(segment %s and chain %s and resid %s and name %s)' % (segn, chid, resi, atom_name ))
+            s1 = []
+            for p,s in zip(prefix, a.split(',')):
+                if s:
+                    s1.append(p + ' ' + s)
+           
+            sel.append(' and '.join(s1))
         sel = 'not (' + ' or '.join(sel) + ')'
         
         return  molecule.select(sel).copy()
@@ -1242,6 +1271,10 @@ class Glycosylator:
         self.builder = MoleculeBuilder(topofile, paramfile)
         self.connect_topology = {}
         self.glycan_keys = {}
+        self.glyco_protein = {}
+        self.glycanMolecules = {}
+        self.glycans = {}
+        self.names = {}
 
     def read_connectivity_topology(self, connectfile):
         """Parse file defining the topology of connectivity trees.
@@ -1309,8 +1342,10 @@ class Glycosylator:
                 unsorted_graph[gr]=[g]
         return unsorted_graph
     
-    def readProtein(self, protein):
-        """
+    def load_glycoprotein(self, protein):
+        """Load and detects glycans in a glycoprotein
+        Parameters:
+            protein: Atomgroup of 
         """
         self.glyco_protein = protein
         self.sequence =  self.glyco_protein.select('name CA').getSequence()
@@ -1429,7 +1464,7 @@ class Glycosylator:
                 link_patch: name of patch (str) which should be used to link glycan
                 template_glycan_tree: dictionary with the identified glycan that should be modified
                                 key: identification of each unit in glycan
-                                value: selection for residue; segname, chain, resid
+                                value: selection for residue; segname, chain, resid, icode
                 template_glycan: AtomGroup containing the glycan that should be modified
 
         Returns:
@@ -1440,6 +1475,7 @@ class Glycosylator:
 
         resid = 1
         dummy_patch = 'DUMMY_MAN'
+        prefix = ['segment', 'chain', 'resid', 'icode']
         glycan = None
         glycan_bonds = []
         built_glycan = {}
@@ -1447,7 +1483,7 @@ class Glycosylator:
         dele_atoms = []
         if template_glycan_tree and template_glycan:
             inv_template_glycan_tree = {v: k for k, v in template_glycan_tree.items()}
-            resid = template_glycan.getResnums()[-1]
+            resid = template_glycan.getResnums()[-1] + 1
             chain = template_glycan.getChids()[0]
             segname = template_glycan.getSegnames()[0]
         
@@ -1467,11 +1503,15 @@ class Glycosylator:
 
                 #check if residue exists
                 if unit in inv_template_glycan_tree:
-                    s,c,r = inv_template_glycan_tree[unit].split(',')
-                    sel = '(segment %s) and (chain %s) and (resid %s)' % (s, c, r)
+                    sel  = []
+                    
+                    for p,s in zip(prefix, inv_template_glycan_tree[unit].split(',')):
+                        if s:
+                            sel.append(p + ' ' + s)
+                    sel = ' and '.join(sel)
                     sel_residue = template_glycan.select(sel)
                     if sel_residue.getResnames()[0] == glycan_topo[unit]:
-                        built_glycan[unit] = ','.join([segname, chain, str(resid)])
+                        built_glycan[unit] = ','.join([segname, chain, str(resid),])
                         #built_glycan[unit] = inv_template_glycan_tree[unit]
                         new_residue,missing_atoms,bonds = self.builder.add_missing_atoms(sel_residue, resid)
                         #new_residue.setResnums([resid]*len(new_residue))
@@ -1488,8 +1528,11 @@ class Glycosylator:
                         new_residue, del_atom, bonds = self.builder.build_from_DUMMY(resid, glycan_topo[unit], chain, segname, dummy_patch)
                 elif previous in built_glycan and lunit:
                     patch = lunit[-1]
-                    s,c,r = built_glycan[previous].split(',')
-                    sel = '(segment %s) and (chain %s) and (resid %s)' % (s, c, r)
+                    sel = []
+                    for p,s in zip(prefix, built_glycan[previous].split(',')):
+                        if s:
+                            sel.append(p + ' ' + s)
+                    sel = ' and '.join(sel)
                     previous_residue = glycan.select(sel)
                     if new_residue:
                         del_atom, b = self.builder.apply_patch(patch,previous_residue, new_residue)
@@ -1500,7 +1543,7 @@ class Glycosylator:
                     print 'Error in connect tree!! Glycans will not be builts'
                     return [], []
 
-                built_glycan[unit] = ','.join([segname, chain, str(resid)])
+                built_glycan[unit] = ','.join([segname, chain, str(resid),])
                 dele_atoms += del_atom
                 glycan_bonds.extend(bonds)
                 
@@ -1909,7 +1952,7 @@ class Drawer():
         self.Colors['yellow'] = np.array([255, 255, 102])
         self.Colors['red'] = np.array([204, 0, 0])
         self.side = .25
-        self.scaling = 10
+        self.scaling = 5. 
 
     def get_shape(self, name, pos):
         """Returns a Matplotlib patch 
@@ -1947,9 +1990,9 @@ class Drawer():
         colors.append(color)
         for seq in sequons:
             s,c,r,i = seq.split(',')
-            r = (int(r)-start_resid)/self.scaling
             if i:
                 r += ord(i)-96 
+            r = (int(r)-start_resid)/self.scaling
             patches.append(Rectangle(np.array([pos[0]+r, pos[1]]) - self.side, 2*self.side, 2*self.side)) 
             colors.append([.5, .5, .5])
 
@@ -1974,16 +2017,20 @@ class Drawer():
         if not ax:
             fig, ax = plt.subplots()
         direction = 1
-        for k in trees.keys():
+        keys = alphanum_sort(trees.keys())
+        for k in keys:
             s,c,r,i = k.split(',')
-            r_pos = [(int(r)-start_resid)/self.scaling, direction*self.side*2]
             if i:
-                r_pos[0] += ord(i)-96
+                r += ord(i) - 64 
+            r_pos = [(int(r)-start_resid)/self.scaling, direction*(self.side * 3.5)]
             root, tree =  trees[k]
             self.draw_tree(tree, root, names, r_pos, direction = direction, ax= ax)
             direction *= -1
 
         plt.axis('equal')
+        plt.axis('off')
+        fig = plt.gcf()
+        fig.tight_layout()
         return ax
 
     def draw_tree(self, tree, root, names, root_pos = [0, 0], direction = 1, ax = None):

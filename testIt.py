@@ -1,5 +1,6 @@
 import glycosylator as GL
 from prody import *
+import matplotlib.pyplot as plt
 
 #Reads a NAG and adds all missing atoms
 myMol = GL.Molecule('NAG')
@@ -78,4 +79,12 @@ dihe_parameters = myGlycosylator.builder.Parameters.parameters['DIHEDRALS']
 mySampler = GL.Sampler([myNman8], HIV, dihe_parameters)
 #nbr_count,clashes = mySampler.count_clashes(myMan9)
 #print nbr_count, 'clashes were detected: ', clashes
+
+#Draw
+protein = parsePDB('./support/examples/4tvp.pdb').select('chain G').copy()
+myGlycosylator.load_glycoprotein(protein)
+myDrawer = GL.Drawer()
+ax = myDrawer.draw_protein(len(myGlycosylator.sequence), myGlycosylator.get_start_resnum(), myGlycosylator.sequons.keys())
+ax = myDrawer.draw_all_trees(myGlycosylator.glycans, myGlycosylator.get_start_resnum(), myGlycosylator.names, ax=ax)
+plt.show(block=False)
 
