@@ -1267,11 +1267,19 @@ class Glycosylator:
             builder: MoleculeBuilder
             connect_topology: dictionary describing the topology of known glycans
             glycan_keys: dictionary for identifying glycans (built from connect_topology) 
+            glycoprotein: Atomgroup representing the glycoprotein
+            sequences: dictionary with protein chain as keys and sequences as value
+            sequons: dictionary with sequon residue id as keys and sequon triplet as value
+            glycanMolecules: dictionary with protein residue as keys and Molecules instances as values
+            glycans: dictionary with protein residue as keys and graph of connected glycan as values
+            names: dictionary of residue names for linked glycans
         """
         self.builder = MoleculeBuilder(topofile, paramfile)
         self.connect_topology = {}
         self.glycan_keys = {}
-        self.glyco_protein = {}
+        self.glycoprotein = {}
+        self.sequences = {}
+        self.sequons = {}
         self.glycanMolecules = {}
         self.glycans = {}
         self.names = {}
@@ -1347,28 +1355,69 @@ class Glycosylator:
         Parameters:
             protein: Atomgroup of 
         """
-        self.glyco_protein = protein
-        self.sequence =  self.glyco_protein.select('name CA').getSequence()
-        self.sequons = self.find_sequons(self.glyco_protein.getSegnames()[0], self.glyco_protein.getChids()[0])
+        self.glycoprotein = protein
+        sel  = self.glycoprotein.select('name CA')
+        segn = sel.getSegnames()
+        chids = sel.getChids()
+       
+        fragids = []
+        for s,c in zip(segn,chids):
+            fragids.append(s + ',' + c)
+        fragids = set(fragids)
+        for i in fragids:
+            sel = ['name CA']
+            for p,s in zip(['segment ', 'chain '], i.split(',')):
+                if s:
+                    sel.append(p+s)
+            sel = ' and '.join(sel)
+            sel  = self.glycoprotein.select(sel)
+            self.sequences[i] = sel.getSequence() 
+            self.sequons.update(self.find_sequons(sel))
+
         self.glycans,self.names = self.find_glycans('NGLB', 'ASN')
     
-    def get_start_resnum(self):
-        return self.glyco_protein.select('name CA').getResnums()[0]
+    def get_start_resnum(self, chid):
+        sel = ['name CA']
+        for p,s in zip(['segment ', 'chain '], chid.split(',')):
+            if s:
+                sel.append(p+s)
+        return self.glycoprotein.select(' and '.join(sel)).getResnums()[0]
 
-    def find_sequons(self, segn, chid):
-        """finds all sequon in protein
+    def get_glycans(self, sequons):
+        """Returns a dictornary of glycans detected for sequons
+        """
+        glycans = {}
+        for s in sequons:
+            if s in self.glycans:
+                glycans[s] = self.glycans[s]
+        return glycans
+
+    def get_sequons(self, chid):
+        """Returns all sequons of a chain (chid)
+        """
+        return [k for k in self.sequons.keys() if chid in k[:len(chid)]]
+
+    def find_sequons(self, sel):
+        """finds all sequon in AtomGroup
         """
         sequons = {}
-        sel = self.glyco_protein.select('name CA') 
         res = sel.getResnums()
         icodes = sel.getIcodes()
-
-        for m in re.finditer(r'(N[^P][S|T])', self.sequence):
-           sequons[','.join([segn, chid, str(res[m.start()]), icodes[m.start()]])] = m.group()
+        segn =  sel.getSegnames()
+        chid = sel.getChids()
+        for m in re.finditer(r'(N[^P][S|T])', sel.getSequence()):
+            idx = m.start()
+            sequons[','.join([segn[idx], chid[idx], str(res[idx]), icodes[idx]])] = m.group()
         return sequons
     
     def find_glycans(self, patch, resname):
-        """
+        """Looks from all molecules (not protein) which are linked (1.7A) to residue
+            Parameters:
+                patch: name of patch that connects molecule to residue
+                resname: residue name to which the molecule is bound
+            Returns:
+                glycans: dictionary with residue id as key and a list of root unit and graph of glycan
+                names: dictionary with glycan id as key and glycan resname as value
         """
         at = self.builder.Topology.patches[patch]['BOND'][0:2]
         for a in at:
@@ -1377,7 +1426,7 @@ class Glycosylator:
             else:
                 a2 = a[1:]
         #a2 is assumed to be the glycan atoms and a1 from protein
-        sel = self.glyco_protein.select('(not protein and name %s) or (resname %s and name %s)' % (a2,resname,a1))
+        sel = self.glycoprotein.select('(not protein and name %s) or (resname %s and name %s)' % (a2,resname,a1))
         kd = KDTree(sel.getCoords())
         kd.search(1.7)
         atoms = kd.getIndices()
@@ -1405,9 +1454,13 @@ class Glycosylator:
 
 
     def connect_all_glycans(self, G):
+        """Builds a connectivity graph for molecules (not protein) in AtomGroup
+            Parameters:
+                G: undirected graph of connected elements
+            Returns:
+                names: dictionary with residue id (get_id) as keys and residue name as value
         """
-        """
-        sel = self.glyco_protein.select('not protein')
+        sel = self.glycoprotein.select('not protein')
         kd = KDTree(sel.getCoords())
         kd.search(1.7)
         atoms = kd.getIndices()

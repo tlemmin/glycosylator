@@ -81,10 +81,18 @@ mySampler = GL.Sampler([myNman8], HIV, dihe_parameters)
 #print nbr_count, 'clashes were detected: ', clashes
 
 #Draw
-protein = parsePDB('./support/examples/4tvp.pdb').select('chain G').copy()
+protein = parsePDB('./support/examples/4tvp.pdb')
 myGlycosylator.load_glycoprotein(protein)
+
 myDrawer = GL.Drawer()
-ax = myDrawer.draw_protein(len(myGlycosylator.sequence), myGlycosylator.get_start_resnum(), myGlycosylator.sequons.keys())
-ax = myDrawer.draw_all_trees(myGlycosylator.glycans, myGlycosylator.get_start_resnum(), myGlycosylator.names, ax=ax)
+for chid in  myGlycosylator.sequences.keys():
+    l = len(myGlycosylator.sequences[chid])
+    sequons = [k for k in myGlycosylator.sequons.keys() if chid in k[:len(chid)]]
+    ax = myDrawer.draw_protein(l, myGlycosylator.get_start_resnum(chid), sequons)
+    glycans = {}
+    for s in sequons:
+        if s in myGlycosylator.glycans:
+            glycans[s] = myGlycosylator.glycans[s]
+    ax = myDrawer.draw_all_trees(glycans, myGlycosylator.get_start_resnum(chid), myGlycosylator.names, ax=ax)
 plt.show(block=False)
 
