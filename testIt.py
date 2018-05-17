@@ -1,7 +1,7 @@
 import glycosylator as GL
 from prody import *
 import matplotlib.pyplot as plt
-
+import numpy as np
 #Reads a NAG and adds all missing atoms
 myMol = GL.Molecule('NAG')
 myMol.read_molecule_from_PDB('support/examples/NAG.pdb')
@@ -85,14 +85,16 @@ protein = parsePDB('./support/examples/4tvp.pdb')
 myGlycosylator.load_glycoprotein(protein)
 
 myDrawer = GL.Drawer()
+i = 1
 for chid in  myGlycosylator.sequences.keys():
     l = len(myGlycosylator.sequences[chid])
     sequons = [k for k in myGlycosylator.sequons.keys() if chid in k[:len(chid)]]
-    ax = myDrawer.draw_protein(l, myGlycosylator.get_start_resnum(chid), sequons)
+    ax = myDrawer.draw_protein(l, myGlycosylator.get_start_resnum(chid), sequons, axis = i)
     glycans = {}
     for s in sequons:
         if s in myGlycosylator.glycans:
             glycans[s] = myGlycosylator.glycans[s]
-    ax = myDrawer.draw_all_trees(glycans, myGlycosylator.get_start_resnum(chid), myGlycosylator.names, ax=ax)
+    ax = myDrawer.draw_all_trees(glycans, myGlycosylator.get_start_resnum(chid), myGlycosylator.names, ax=ax, axis = i)
+    i = np.mod(i+1, 2)
 plt.show(block=False)
 
