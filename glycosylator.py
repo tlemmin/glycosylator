@@ -31,6 +31,7 @@ from prody import *
 from itertools import izip
 from scipy.spatial import distance
 from scipy.interpolate import interp1d
+import sqlite3
 
 from matplotlib.patches import Circle, Rectangle, Polygon
 from matplotlib.collections import PatchCollection
@@ -1291,7 +1292,7 @@ class Glycosylator:
 
     def read_connectivity_topology(self, connectfile):
         """Parse file defining the topology of connectivity trees.
-    This function will initialize connect_topology and glycan_keys
+        This function will initialize connect_topology and glycan_keys
 
         Each connectivity is defined by
             RESI: name of the polyglycan
@@ -1320,7 +1321,83 @@ class Glycosylator:
         residue['#UNIT'] = nbr_units
         self.connect_topology[resname] = copy.copy(residue)
         self.build_keys()
+    
+    def import_connectivity_topology(self, filename):
+        """Import connectivity topology from sql database
+        This function will initialize connect_topology
+        Parameters:
+            filename: path to database
+        """
+        try:
+            conn = sqlite3.connect(filename)
+        except:
+            print "Error while connecting to the database " + filename
+            return -1
+        cursor =  conn.cursor()
+        cursor.execute("SELECT * FROM glycans")
+        glycans = cursor.fetchall()
 
+        self.connect_topology = {}
+        for glycan in glycans:
+            name,tree =  glycan
+            residue = {}
+            residue['UNIT'] = []
+            nbr_unit = 0
+            for unit in tree.split('|'):
+                unit = unit.split(' ')
+                nbr_unit += 1
+                if len(unit) > 2:
+                    residue['UNIT'].append([unit[0],unit[1], unit[2:]])
+                else:
+                    residue['UNIT'].append([unit[0], ' ', []])
+                
+            residue['#UNIT'] = nbr_unit
+            self.connect_topology[name] = residue
+        self.build_keys()
+
+    def add_glycan_to_connectivity_topology(self, name, connect_tree, overwrite = True):
+        """Add new glycan to connect_topology dictionary
+        Parameters:
+            name: name of new glycan
+            connect_tree: dictionary with connectivity tree
+            overwrite: should an existing glycan be overwritten
+        """
+        if name in self.connect_topology and not overwrite:
+            print "Glycan with same name " + name + "already exists. Please change name or allow overwritting"
+            return -1
+        self.connect_topology[name] = connect_tree
+    
+    def export_connectivity_topology(self, filename):
+        """Export connectivity topology to sql database
+        This function will 
+        """
+        try:
+            conn = sqlite3.connect(filename)
+        except:
+            print "Error while connecting to the database " + filename
+            return -1
+        cursor =  conn.cursor()
+        tn = 'glycans'
+        gn = 'glycan_name'
+        gt = 'glycan_tree'
+        cursor.execute("DROP TABLE IF EXISTS {tn}".format(tn = tn))
+        cursor.execute("CREATE TABLE {tn} ({gn} text, {gt} text)".format(tn =  tn, gn = gn, gt = gt))
+
+        for key in self.connect_topology.keys():
+            units = self.connect_topology[key]['UNIT']
+            glycan = []
+            for unit in units:
+                v = []
+                v.extend(unit[0:2])
+                v.extend(unit[2])
+                glycan.append(' '.join(v))
+            glycan = '|'.join(glycan)
+            
+            cursor.execute("INSERT INTO {tn} VALUES (\'{gn}\', \'{gt}\')".format(tn = tn, gn = key, gt = glycan))
+
+        conn.commit()
+        conn.close()
+    
     def build_keys(self):
         self.glycan_keys = {}
         for res in self.connect_topology:
@@ -1331,7 +1408,7 @@ class Glycosylator:
         if len(unit)>2:
             residue['UNIT'].append([unit[1], unit[2], unit[3:]])
         else:
-            residue['UNIT'].append([unit[1], [], []])
+            residue['UNIT'].append([unit[1], ' ', []])
     
     def build_glycan_gaph(self, connect_tree):
         """Builds a graph representation of a connectivity tree
@@ -1360,6 +1437,8 @@ class Glycosylator:
         Parameters:
             protein: Atomgroup of 
         """
+        if type(protein) == str:
+            protein = parsePDB(protein)
         self.glycoprotein = protein
         sel  = self.glycoprotein.select('name CA')
         segn = sel.getSegnames()
@@ -1385,7 +1464,16 @@ class Glycosylator:
             self.sequons.update(self.find_sequons(sel, self.sequences[i]))
 
         self.glycans,self.names = self.find_glycans('NGLB', 'ASN')
-    
+
+    def save_glycoprotein(self, filename):
+        """Saves glycoprotein to PDB file
+        Parameter:
+            filename: path 
+        """
+        glycoprotein = None
+        writePDB(filename)
+
+
     def getSequence(self, sel):
         res =  sel.getResnames()
         return "".join(aaa2a[r] for r in res)
@@ -1649,7 +1737,7 @@ class Glycosylator:
         Parameters:
             glycan_name: name of the glycan
         Returns:
-            glycan_topo: dictionary with connectivy and resname of glycon
+            glycan_topo: dictionary with connectivy and resname of glycan
         """
         glycan_topo = {}
         units = self.connect_topology[glycan_name]['UNIT']
@@ -2038,8 +2126,45 @@ class Drawer():
             if shape == 'triangle':
                 return Polygon([(pos[0]-self.side, pos[1]), (pos[0]+self.side, pos[1]-self.side), (pos[0]+self.side, pos[1]+self.side)]),color
 
+    def draw_protein_fragment(self, pos = [0., 0.], length = 10, color = [.7, .7, .7], ax = None, axis = 0):
+        """
+        Parameters:
+            pos: position of sequon
+            length: length of fragment
+            color: color of protein
+            axis: axis along which to draw glycan. 0 for x and 1 for y.
+        Returns:
+            ax: axis of plot
+        """
+        if not ax:
+            fig, ax = plt.subplots()
+    	shape = [0, 0]
+    	shape[axis] = length/self.scaling
+    	shape[np.mod(axis+1, 2)] = 2*self.side
+        p_fragment = np.array([0., 0.])
+        p_fragment[axis] = -shape[axis]/2
+        p_fragment[np.mod(axis+1, 2)] = -(self.side * 3.5) 
+        protein = Rectangle(p_fragment - self.side, shape[0], shape[1])
+        patches = []
+        colors = []
+        patches.append(protein)
+        colors.append(color)
+        new_pos = np.array([0., 0.])
+        new_pos[axis] = pos[axis] 
+        new_pos[np.mod(axis+1, 2)] = pos[np.mod(axis+1, 2)] -(self.side * 3.5) 
+        patches.append(Rectangle(new_pos - self.side, 2*self.side, 2*self.side)) 
+        colors.append([.5, .5, .5])
 
-    def draw_protein(self, length, start_resid, sequons, pos = [0., 0.], color = [.7, .7, .7], ax = None, axis = 0):
+        p = PatchCollection(patches, zorder = 3) 
+        p.set_edgecolors([.2, .2, .2])
+        p.set_linewidth(2)
+        p.set_facecolors(colors)
+        ax.add_collection(p)
+        
+        return ax
+        
+
+    def draw_glycoprotein(self, length, start_resid, sequons, pos = [0., 0.], color = [.7, .7, .7], ax = None, axis = 0, trees = None, names =  None):
         """
         Parameters:
             length: length of the protein
@@ -2048,6 +2173,8 @@ class Drawer():
             pos: starting position of sequence
             color: color of protein
             axis: axis along which to draw glycan. 0 for x and 1 for y.
+            trees: dictionary with sequon as key and list of root and glycan graph as value
+            names: dictionary with glycan nodes as keys and resnames as values
         Returns:
             ax: axis of plot
         """
@@ -2061,8 +2188,11 @@ class Drawer():
         colors = []
         patches.append(protein)
         colors.append(color)
+        direction = -1
+        sequons = alphanum_sort(sequons)
         for seq in sequons:
-            s,c,r,i = seq.split(',')
+            s,c,rr,i = seq.split(',')
+            r = rr
             if i:
                 r += ord(i.upper()) - 64 
             r = (float(r)-start_resid)/self.scaling
@@ -2072,6 +2202,28 @@ class Drawer():
             patches.append(Rectangle(new_pos - self.side, 2*self.side, 2*self.side)) 
             colors.append([.5, .5, .5])
 
+            new_pos[np.mod(axis+1, 2)] = direction * (self.side * 3.5) 
+            if axis:
+                h_align = 'right' if direction == -1 else 'left'
+                v_align = 'center' 
+                rotation = 'horizontal'
+            else:
+                h_align = 'center' 
+                v_align = 'top' if direction == -1 else 'bottom'
+                rotation = 'vertical'
+            ax.text(new_pos[0], new_pos[1], rr+i,
+                    verticalalignment = v_align, horizontalalignment = h_align, 
+                    rotation = rotation)
+            direction *= -1
+
+            if seq in trees:
+                r_pos = [0, 0]
+                r_pos[axis] = r 
+                r_pos[np.mod(axis+1, 2)] = direction*(self.side * 3.5)
+                root, tree =  trees[seq]
+                self.draw_tree(tree, root, names, r_pos, direction = direction, ax= ax, axis=axis)
+
+
         p = PatchCollection(patches, zorder = 3) 
         p.set_edgecolors([.2, .2, .2])
         p.set_linewidth(2)
@@ -2079,6 +2231,7 @@ class Drawer():
         ax.add_collection(p)
         
         return ax
+
 
     def draw_all_trees(self, trees, start_resid, names, ax = None, axis = 0):
         """Draws all glycans in a protein
@@ -2111,6 +2264,7 @@ class Drawer():
         fig = plt.gcf()
         fig.tight_layout()
         return ax
+    
 
     def draw_tree(self, tree, root, names, root_pos = [0, 0], direction = 1, ax = None, axis = 0):
         """Draws a tree representation of a glycan
