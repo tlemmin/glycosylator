@@ -1464,14 +1464,17 @@ class Glycosylator:
             self.sequons.update(self.find_sequons(sel, self.sequences[i]))
 
         self.glycans,self.names = self.find_glycans('NGLB', 'ASN')
+        self.extract_glycans()
 
     def save_glycoprotein(self, filename):
         """Saves glycoprotein to PDB file
         Parameter:
             filename: path 
         """
-        glycoprotein = None
-        writePDB(filename)
+        glycosylated_protein = self.protein.copy()
+        for g in self.glycanMolecules.values():
+            glycosylated_protein += g.get
+        writePDB(filename, glycosylated_protein)
 
 
     def getSequence(self, sel):
@@ -1555,8 +1558,26 @@ class Glycosylator:
                     glycans[node] = [root_glycan, graph]
                     break
         return glycans,names
-
-
+    
+    def extract_glycan(self):
+        prefix = ['segnment', 'chain', 'resid', 'icode']
+        sel_all = []    
+        for k,v in self.glycans.items():
+            r,g = v
+            sel = []
+            for node in g.nodes():
+                selg = []
+                for p,s in zip(prefix, node):
+                    if s:
+                        selg.append(p + ' ' + s)
+                sel.append(' and '.join(selg))
+            sel = ' or '.join(sel)
+            sel_all.append(sel)
+            glycan = Molecule(k)
+            glycan.set_AtomGroup(self.glycoprotein.select(sel).copy())
+            self.glycanMolecules[k] = 
+	self.protein = self.glycoprotein.select('not ' + ' or '.join(sel_all)).copy()
+    
     def connect_all_glycans(self, G):
         """Builds a connectivity graph for molecules (not protein) in AtomGroup
             Parameters:
@@ -2126,7 +2147,7 @@ class Drawer():
             if shape == 'triangle':
                 return Polygon([(pos[0]-self.side, pos[1]), (pos[0]+self.side, pos[1]-self.side), (pos[0]+self.side, pos[1]+self.side)]),color
 
-    def draw_protein_fragment(self, pos = [0., 0.], length = 10, color = [.7, .7, .7], ax = None, axis = 0):
+    def draw_protein_fragment(self, pos = [0., 0.], length = 10, protein_color = [.7, .7, .7], sequon_color = [.5, .5, .5], ax = None, axis = 0):
         """
         Parameters:
             pos: position of sequon
@@ -2148,12 +2169,12 @@ class Drawer():
         patches = []
         colors = []
         patches.append(protein)
-        colors.append(color)
+        colors.append(protein_color)
         new_pos = np.array([0., 0.])
         new_pos[axis] = pos[axis] 
         new_pos[np.mod(axis+1, 2)] = pos[np.mod(axis+1, 2)] -(self.side * 3.5) 
         patches.append(Rectangle(new_pos - self.side, 2*self.side, 2*self.side)) 
-        colors.append([.5, .5, .5])
+        colors.append(sequon_color)
 
         p = PatchCollection(patches, zorder = 3) 
         p.set_edgecolors([.2, .2, .2])
@@ -2164,14 +2185,15 @@ class Drawer():
         return ax
         
 
-    def draw_glycoprotein(self, length, start_resid, sequons, pos = [0., 0.], color = [.7, .7, .7], ax = None, axis = 0, trees = None, names =  None):
+    def draw_glycoprotein(self, length, start_resid, sequons, pos = [0., 0.], protein_color = [.7, .7, .7], sequon_color = {}, ax = None, axis = 0, trees = None, names =  None):
         """
         Parameters:
             length: length of the protein
             start_resid: Index of frist residue
             sequons: position of sequons
             pos: starting position of sequence
-            color: color of protein
+            protein_color: color of protein (list)
+            sequon_color: dictionary of colors for sequons, with sequon id as key and color code as value. Default color [.5, .5, .5]
             axis: axis along which to draw glycan. 0 for x and 1 for y.
             trees: dictionary with sequon as key and list of root and glycan graph as value
             names: dictionary with glycan nodes as keys and resnames as values
@@ -2187,11 +2209,15 @@ class Drawer():
         patches = []
         colors = []
         patches.append(protein)
-        colors.append(color)
+        colors.append(protein_color)
         direction = -1
         sequons = alphanum_sort(sequons)
         for seq in sequons:
             s,c,rr,i = seq.split(',')
+            if seq in sequon_color:
+                color = sequon_color[seq]
+            else:
+                color = [.5, .5, .5]
             r = rr
             if i:
                 r += ord(i.upper()) - 64 
@@ -2200,7 +2226,7 @@ class Drawer():
             new_pos[axis] = pos[axis] + r
             new_pos[np.mod(axis+1, 2)] = pos[np.mod(axis+1, 2)] 
             patches.append(Rectangle(new_pos - self.side, 2*self.side, 2*self.side)) 
-            colors.append([.5, .5, .5])
+            colors.append(color)
 
             new_pos[np.mod(axis+1, 2)] = direction * (self.side * 3.5) 
             if axis:

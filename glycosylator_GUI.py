@@ -33,6 +33,10 @@ class GlycosylatorGUI(tk.Tk):
         self.selected_canvas = None
         self.selection = None
         self.selected_glycan = None
+	
+        #bookkeeping
+        self.sequon_colors = {}
+        self.original_glycans = {}
 
         #create root window
         tk.Tk.__init__(self)
@@ -95,8 +99,8 @@ class GlycosylatorGUI(tk.Tk):
         self.glycan_label = tk.Label(self.right_frame, text="Click to modify glycan")
         self.glycan_2D = tk.Canvas(self.right_frame, width = 150, height = 150, bg = 'red')
         self.glycan_2D.bind("<Button-1>", self.database_window)
-        self.glycosylate = tk.Button(self.right_frame, text="Glycosylate", command = self.database_window)
-        self.glycosylateAll = tk.Button(self.right_frame, text="Glycosylate all")
+        self.glycosylate_button = tk.Button(self.right_frame, text="Glycosylate", command = self.glycosylate)
+        self.glycosylateAll_button = tk.Button(self.right_frame, text="Glycosylate all")
         self.clashes = tk.Button(self.right_frame, text="Remove clashes")
         # Layout right frame       
         i = 0
@@ -107,8 +111,8 @@ class GlycosylatorGUI(tk.Tk):
         self.sequon_menu.grid(column = 0, row =  i); i+=1
         self.glycan_label.grid(column = 0, row =  i, sticky='W'); i+=1
         self.glycan_2D.grid(column = 0, row =  i); i+=1
-        self.glycosylate.grid(column = 0, row =  i); i+=1
-        self.glycosylateAll.grid(column = 0, row =  i); i+=1
+        self.glycosylate_button.grid(column = 0, row =  i); i+=1
+        self.glycosylateAll_button.grid(column = 0, row =  i); i+=1
         self.clashes.grid(column = 0, row =  i); i+=1 
     
     def save_before_close(self):
@@ -128,7 +132,7 @@ class GlycosylatorGUI(tk.Tk):
         l = len(self.myGlycosylator.sequences[chid])
         sequons = [k for k in self.myGlycosylator.sequons.keys() if chid in k[:len(chid)]]
         self.myDrawer.draw_glycoprotein(l, self.myGlycosylator.get_start_resnum(chid), sequons, ax = ax, axis = 0,
-                trees = self.myGlycosylator.glycans, names = self.myGlycosylator.names)
+                trees = self.myGlycosylator.glycans, names = self.myGlycosylator.names, sequon_color = self.sequon_colors)
         ax.axis('equal')
         ax.axis('off')
 
@@ -162,11 +166,16 @@ class GlycosylatorGUI(tk.Tk):
         """
         fig = mpl.figure.Figure(figsize=(1.5, 1.5))
         ax = fig.add_subplot(111)
-        # Draw protein fragment
-        self.myDrawer.draw_protein_fragment(ax = ax)
-        # Drawing glycan
         if type(sequon) is not str:
             sequon =  sequon.get()
+        
+        if sequon in self.sequon_colors:
+            color = self.sequon_colors[sequon]
+        else:
+            color = [.5, .5, .5]
+        # Draw protein fragment
+        self.myDrawer.draw_protein_fragment(ax = ax, sequon_color = color)
+        # Drawing glycan
 
         if sequon not in self.myGlycosylator.glycans:
             return 0 
@@ -518,7 +527,18 @@ class GlycosylatorGUI(tk.Tk):
         conn.close()
 
     def add_glycan(self):
-        pass
+        """Adds a glycan to a library. 
+        Supported format:
+              pdb
+              glycosylator topology 
+        """
+        filename = tkFileDialog.askopenfilename(initialdir = self.cwd, title = "Select glycan library", filetypes = (("pdb files","*.pdb"), ("topology file", "*.top"), ("all files","*.*")))
+        if not filename:
+            return -1
+        glycan = glc.Molecule('glycan')
+        glycan.read_molecule_from_PDB(filename)
+        myGlycosylator.assign_patches(glycan)
+        connect_tree = self.myGlycosylator.build_connectivity_tree() 
 
     def delete_glycan(self):
         """Delete glycan from database
@@ -532,9 +552,16 @@ class GlycosylatorGUI(tk.Tk):
         self.user_images = []
         self.user_canvas = []
         self.display_db(self.canvas_userg, self.user_glycans, self.user_images, self.user_canvas)
-
-
-
+    
+    def glycosylate(self):
+        """ Glycosylate sequon with chosen glycan
+     
+        """
+        chid = self.chain.get()
+        sequon = self.sequon.get()
+        self.sequon_colors[sequon] = [.7, .1, 0]
+        self.draw_glycoprotein(chid)
+	self.draw_glycan(sequon)
 if __name__ == "__main__":
     glycogui = GlycosylatorGUI()
     glycogui.mainloop()
