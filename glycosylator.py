@@ -1274,6 +1274,7 @@ class Glycosylator:
             connect_topology: dictionary describing the topology of known glycans
             glycan_keys: dictionary for identifying glycans (built from connect_topology) 
             glycoprotein: Atomgroup representing the glycoprotein
+            protein: Atomgroup without the identified glycans
             sequences: dictionary with protein chain as keys and sequences as value
             sequons: dictionary with sequon residue id as keys and sequon triplet as value
             glycanMolecules: dictionary with protein residue as keys and Molecules instances as values
@@ -1283,12 +1284,14 @@ class Glycosylator:
         self.builder = MoleculeBuilder(topofile, paramfile)
         self.connect_topology = {}
         self.glycan_keys = {}
-        self.glycoprotein = {}
+        self.glycoprotein = None 
+        self.protein = None
         self.sequences = {}
         self.sequons = {}
         self.glycanMolecules = {}
         self.glycans = {}
         self.names = {}
+        self.prefix = ['segment', 'chain', 'resid', 'icode']
 
     def read_connectivity_topology(self, connectfile):
         """Parse file defining the topology of connectivity trees.
@@ -1473,9 +1476,19 @@ class Glycosylator:
         """
         glycosylated_protein = self.protein.copy()
         for g in self.glycanMolecules.values():
-            glycosylated_protein += g.get
+            glycosylated_protein += g.atom_group
+            print 'adding'
         writePDB(filename, glycosylated_protein)
 
+    def get_residue(self, res_id):
+        """Returns an AtomGroup of given atom id; composed of 'segname,chain,resid,icode,atomName'
+        """
+        sel = []
+        for p,s in zip(self.prefix, res_id.split(',')):
+            if s:
+                sel .append(p + ' ' + s)
+        sel = ' and '.join(sel)
+        return self.glycoprotein.select(sel)
 
     def getSequence(self, sel):
         res =  sel.getResnames()
@@ -1559,25 +1572,27 @@ class Glycosylator:
                     break
         return glycans,names
     
-    def extract_glycan(self):
-        prefix = ['segnment', 'chain', 'resid', 'icode']
+    def extract_glycans(self):
         sel_all = []    
         for k,v in self.glycans.items():
             r,g = v
             sel = []
             for node in g.nodes():
                 selg = []
-                for p,s in zip(prefix, node):
+                for p,s in zip(self.prefix, node.split(',')):
                     if s:
                         selg.append(p + ' ' + s)
+                if not sel:
+                    # !!!hard coded!!! Should be patch dependent
+                    rootAtom = self.glycoprotein.select(' and '.join(selg) + ' and name C1').getSerials()[0]
                 sel.append(' and '.join(selg))
-            sel = ' or '.join(sel)
+            sel = '(' + ') or ('.join(sel) +')'
             sel_all.append(sel)
             glycan = Molecule(k)
-            glycan.set_AtomGroup(self.glycoprotein.select(sel).copy())
-            self.glycanMolecules[k] = 
-	self.protein = self.glycoprotein.select('not ' + ' or '.join(sel_all)).copy()
-    
+            glycan.set_AtomGroup(self.glycoprotein.select(sel).copy(), rootAtom = rootAtom)
+            self.glycanMolecules[k] = glycan
+        self.protein = self.glycoprotein.select('not ((' + ') or ('.join(sel_all) + '))').copy()
+     
     def connect_all_glycans(self, G):
         """Builds a connectivity graph for molecules (not protein) in AtomGroup
             Parameters:

@@ -1,3 +1,24 @@
+#! /usr/bin/env python
+'''
+----------------------------------------------------------------------------
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>
+
+2016 Thomas Lemmin
+----------------------------------------------------------------------------
+'''
+
 import Tkinter as tk
 import ttk
 import Tkconstants, tkFileDialog, tkMessageBox
@@ -25,6 +46,7 @@ class GlycosylatorGUI(tk.Tk):
         self.myGlycosylator = glc.Glycosylator(SELF_BIN +'/support/toppar_charmm/carbohydrates.rtf', SELF_BIN + '/support/toppar_charmm/carbohydrates.prm')
         self.myGlycosylator.builder.Topology.read_topology(SELF_BIN +'/support/topology/DUMMY.top')
         self.myDrawer = glc.Drawer()
+        #database variables
         self.user_glycans = {} 
         self.db_commong = SELF_BIN + '/test_db.db'
         self.common_glycans = {}
@@ -37,11 +59,13 @@ class GlycosylatorGUI(tk.Tk):
         #bookkeeping
         self.sequon_colors = {}
         self.original_glycans = {}
+        self.linked_glycans = {}
 
         #create root window
         tk.Tk.__init__(self)
         self.title('Glycosylator')
         self.geometry('520x520')
+        self.dpi = 50.
         #self.resizable(False, False)
         self.protocol('WM_DELETE_WINDOW', self.save_before_close)
         # Create menubar
@@ -164,7 +188,7 @@ class GlycosylatorGUI(tk.Tk):
         Parameters:
             sequon: id of sequon
         """
-        fig = mpl.figure.Figure(figsize=(1.5, 1.5))
+        fig = mpl.figure.Figure(figsize=(100/self.dpi, 100/self.dpi))
         ax = fig.add_subplot(111)
         if type(sequon) is not str:
             sequon =  sequon.get()
@@ -177,9 +201,12 @@ class GlycosylatorGUI(tk.Tk):
         self.myDrawer.draw_protein_fragment(ax = ax, sequon_color = color)
         # Drawing glycan
 
-        if sequon not in self.myGlycosylator.glycans:
-            return 0 
-        root,tree =  self.myGlycosylator.glycans[sequon]
+        if sequon in self.linked_glycans:
+            root,tree =  self.linked_glycans[sequon]
+        elif sequon in self.original_glycans:
+            root,tree =  self.original_glycans[sequon]
+        else:
+            return 0
         self.myDrawer.draw_tree(tree, root, self.myGlycosylator.names, root_pos = [0, 0], direction = 1, ax = ax, axis = 0)
         ax.axis('equal')
         ax.axis('off')
@@ -202,7 +229,7 @@ class GlycosylatorGUI(tk.Tk):
         Parameters:
             chid: chain id (string or handle)
         """
-        fig = mpl.figure.Figure(figsize=(4, 10)) 
+        fig = mpl.figure.Figure(figsize=(250/self.dpi, 500/self.dpi)) 
         ax = fig.add_axes([0, 0, 1, 1])
 
         if type(chid) is not str:
@@ -234,6 +261,7 @@ class GlycosylatorGUI(tk.Tk):
         if not filename:
             return -1
         self.myGlycosylator.load_glycoprotein(filename)
+        self.original_glycans = self.myGlycosylator.glycanMolecules.copy()
         chids = self.myGlycosylator.sequences.keys()
         self.chain_menu['menu'].delete(0, 'end')
         self.chain.set(chids[0])
@@ -260,7 +288,9 @@ class GlycosylatorGUI(tk.Tk):
         if filename is None:
             return
         print filename
-        #self.myGlycosylator.save_glycoprotein(filename)
+        self.myGlycosylator.glycanMolecules = self.linked_glycans
+        print self.linked_glycans
+        self.myGlycosylator.save_glycoprotein(filename)
 
 
     def show_database(self):
@@ -274,8 +304,24 @@ class GlycosylatorGUI(tk.Tk):
             self.selected_canvas = None
             self.selection = None
         self.db_window.withdraw()
-
-    def select_glycan(self):
+        if self.selected_glycan:
+            key = self.sequon.get()
+            self.myGlycosylator.connect_topology['SELECTED'] = self.selected_glycan[1]
+            residue = self.myGlycosylator.get_residue(key)
+            original_glycan = None
+            connect_tree = None 
+            #if key in self.original_glycans:
+            #    connect_tree = 
+            #    original_glycan = self.original_glycans[key]
+            glycan,bonds = self.myGlycosylator.glycosylate('SELECTED', 
+                                                            template_glycan_tree = connect_tree, 
+                                                            template_glycan = original_glycan,
+                                                            link_residue=residue, link_patch = 'NGLB')
+            new_glycan = glc.Molecule('New')
+            new_glycan.set_AtomGroup(glycan, bonds = bonds)
+            self.linked_glycans[key] = new_glycan
+ 
+    def select_glycan(self, event = None):
         if not self.selected_glycan:
             tkMessageBox.showerror("Error", "Please select a glycan")
         else:
@@ -293,6 +339,7 @@ class GlycosylatorGUI(tk.Tk):
         self.db_window.wm_title("Glycan Databases")
         self.db_window.protocol('WM_DELETE_WINDOW', self.hide_database)
         #tabs
+        self.db_window.bind('<Return>', self.select_glycan)
         self.tab_control = ttk.Notebook(self.db_window)
         self.tb_commong = tk.Frame(self.tab_control)
         self.tb_userg = tk.Frame(self.tab_control)
