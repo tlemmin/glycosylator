@@ -544,8 +544,8 @@ class Molecule:
         """
         if update_bonds:
             self.guess_bonds()
-        self.guess_angles()
-        self.guess_dihedrals()
+        #self.guess_angles()
+        #self.guess_dihedrals()
         self.update_graphs()
         self.bonded_uptodate = True 
 
@@ -1604,6 +1604,7 @@ class Glycosylator:
         kd = KDTree(sel.getCoords())
         kd.search(1.7)
         atoms = kd.getIndices()
+        atom_names = sel.getNames()
         names = {} 
         ids,rn = self.get_ids(sel)
 
@@ -1620,7 +1621,11 @@ class Glycosylator:
 
             if id1 != id2:
                 e = (id1, id2)
-                G.add_edge(*e)
+                an1 = atom_names[a1]
+                an2 = atom_names[a2]
+                patch = self.find_patch(an1, an2)
+                G.add_edge(id1, id2, patch = patch, atoms = an1 + ':' + an2)
+                #G.add_edge(*e)
                 names[id1] = rn1
                 names[id2] = rn2
 
@@ -1826,6 +1831,24 @@ class Glycosylator:
             connect_tree[n] = ' ' .join(value)
         connect_tree.items().sort(key=lambda id:len(id[1]))
         return connect_tree
+
+    def build_connect_topology(self, molecule):
+        """Builds connectivity topology
+        Parameters:
+            molecule: Molecule object
+        """
+        G = molecule.interresidue_connectivity
+        connect_tree = self.build_connectivity_tree(molecule.rootRes, G) 
+        
+        target=[]
+        for r in connect_tree.keys():
+            target.append(G.node[r]['resname'] + ' ' + connect_tree[r])
+        len_target=len(target)
+        residue = {}
+        residue['UNIT'] =  target
+        residue['#UNIT'] = len_target
+        return residue
+
 
     def identify_glycan(self, molecule):
         """Identifies glycan name
@@ -2344,6 +2367,37 @@ class Drawer():
 
         return ax
 
+    def tree_to_text(self, tree, root, names, glyPAC = '', visited = []):
+        """Returns UIPAC like string of a glycan.
+        []: branch
+        (): connectivity
+        Example: Man3 == NAG(14bb)NAG(14bb)BMA[(16ab)MAN](13ab)MAN
+        Parameters:
+            tree: directed graph of a rooted tree
+            root: id of root vertex
+        Returns:
+            glyPAC: string representing the glycan
+        """
+        if not glyPAC:
+            glyPAC = names[root] 
+        while 1:           
+            visited.append(root)
+            successors = [n for n in tree.neighbors(root) if n not in visited]
+            if not successors:
+                break
+            branches =  len(successors)
+            for s in successors:
+                patch = tree[root][s]['patch']
+                if branches > 1:
+                    glyPAC += '[(' + patch + ')' + names[s] 
+                    glyPAC = self.tree_to_text(tree, s, names, glyPAC, visited)
+                    glyPAC += ']'
+                    branches -= 1
+                else:
+                    glyPAC += '(' + patch + ')' + names[s] 
+            root = s
+	return glyPAC
+    
     def compute_positions(self, tree, root, root_pos = [0, 0], direction = 1, axis = 0 ):
         """Computes positions of vertices for drawing a tree
         1-2--3-8
