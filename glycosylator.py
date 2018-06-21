@@ -429,7 +429,6 @@ class Molecule:
         self.atom_group = AtomGroup(self.name)
         self.chain = chain
         self.segn = segn
-        self.rootAtom = 1
         self.rootAtom = ','.join([segn, chain, 'O',]) 
         self.bonds = []
         self.angles = []
@@ -488,6 +487,8 @@ class Molecule:
             self.rootRes = a1.getSegnames()[0] + ',' + a1.getChids()[0] + ',' + str(a1.getResnums()[0])+ ',' + a1.getIcodes()[0]
             if update_bonds:
                 self.update_connectivity()
+            else:
+                self.build_connectivity_graph()
         else:
             print "several chains are present in PDB. Please select only one molecule"
             return -1
@@ -506,6 +507,17 @@ class Molecule:
             ids[i] = {'id': ','.join([s,c,str(r),ic,a])}
         
         self.connectivity.add_nodes_from(ids.items())
+    
+    def get_ids(self, sel):
+        segn = sel.getSegnames()
+        chid = sel.getChids()
+        res = sel.getResnums()
+        ic = sel.getIcodes()
+        rn = sel.getResnames()
+        ids = []
+        for s,c,r,i in zip(segn,chid,res,ic):
+            ids.append(','.join([s, c, str(r), i]))
+        return ids,rn
 
     def get_chain(self):
         return self.chain
@@ -538,6 +550,46 @@ class Molecule:
         """Assignes atom name, type and charge to each atom in the connectivity graph
         """
         self.connectivity.add_nodes_from(atom_type.items())
+
+    def build_connectivity_graph(self):
+        """Builds a connectivity graph for molecules (not protein) in AtomGroup
+            Parameters:
+                G: undirected graph of connected elements
+            Returns:
+                names: dictionary with residue id (get_id) as keys and residue name as value
+        """
+        kd = KDTree(self.atom_group.getCoords())
+        kd.search(1.7)
+        atoms = kd.getIndices()
+        atom_names = self.atom_group.getNames()
+        ids,rn = self.get_ids(self.atom_group)
+        G = nx.Graph()
+        for a1,a2 in atoms:
+            id1 = ids[a1]
+            rn1 = rn[a1]
+            id2 = ids[a2]
+            rn2 = rn[a2]
+            
+            if id1 != id2:
+                e = (id1, id2)
+                an1 = atom_names[a1]
+                an2 = atom_names[a2]
+                G.add_node(id1, resname=rn1)
+                G.add_node(id2, resname=rn2)
+                G.add_edge(id1, id2, patch = '', atoms = an1 + ':' + an2)
+        #create directed graph and remove all unnecessary edges
+        if G:
+            self.interresidue_connectivity = G.to_directed()
+            for edge in nx.dfs_edges(G,self.rootRes): 
+                edge = list(edge)
+                edge.reverse()
+                self.interresidue_connectivity.remove_edge(*edge)
+
+    def get_names(self):
+        """returns a dictironary with the residue ids as keys and residue names as values
+        """
+        return nx.get_node_attributes(self.interresidue_connectivity, 'resname')
+
 
     def update_connectivity(self, update_bonds = True):
         """Updates all the connectivity (bond, angles, dihedrals and graphs)
@@ -593,6 +645,8 @@ class Molecule:
 
             if update_bonds:
                 self.update_connectivity()
+            else:
+                self.build_connectivity_graph()
 
         else:
             print "Several chains are present in AtomGroup. Please select only one molecule"
@@ -1477,7 +1531,7 @@ class Glycosylator:
         glycosylated_protein = self.protein.copy()
         for g in self.glycanMolecules.values():
             glycosylated_protein += g.atom_group
-            print 'adding'
+            
         writePDB(filename, glycosylated_protein)
 
     def get_residue(self, res_id):
@@ -2160,18 +2214,25 @@ class Drawer():
         self.Symbols['BMA'] = ['circle', 'green']
         self.Symbols['GAL'] = ['circle', 'yellow']
         self.Symbols['NAG'] = ['square', 'blue']
+        self.Symbols['NGA'] = ['square', 'yellow']
         self.Symbols['FUC'] = ['triangle', 'red']
+        self.Symbols['SIA'] = ['rhombus', 'purple']
 
         self.Colors = {}
         self.Colors['blue'] = np.array([0, 0, 204])
         self.Colors['green'] = np.array([0, 204, 0])
         self.Colors['yellow'] = np.array([255, 255, 102])
         self.Colors['red'] = np.array([204, 0, 0])
+        self.Colors['purple'] = np.array([167, 13, 206])
         self.side = .25
         self.scaling = 5. 
 
-    def get_shape(self, name, pos):
+    def get_shape(self, name, pos, direction = 1, axis = 0):
         """Returns a Matplotlib patch 
+            name: name of shape
+            pos: vector defining where to draw object
+            direction: direction for drawing glycan: 1 positive y; -1 negative y
+            axis: axis along which to draw glycan. 0 for x and 1 for y.
         """
         pos = np.array(pos)
         if name in self.Symbols:
@@ -2184,6 +2245,12 @@ class Drawer():
                 return Rectangle(pos-self.side, 2*self.side, 2*self.side),color
             if shape == 'triangle':
                 return Polygon([(pos[0]-self.side, pos[1]), (pos[0]+self.side, pos[1]-self.side), (pos[0]+self.side, pos[1]+self.side)]),color
+            if shape == 'rhombus':
+                if axis:
+                    angle = 135 if direction == -1 else -45.
+                else:
+                    angle = -135 if direction == -1 else 45.
+                return Rectangle(pos, 2*self.side, 2*self.side, angle=angle),color
 
     def draw_protein_fragment(self, pos = [0., 0.], length = 10, protein_color = [.7, .7, .7], sequon_color = [.5, .5, .5], ax = None, axis = 0):
         """
@@ -2356,7 +2423,7 @@ class Drawer():
         patches = []
         colors = []
         for node in tree.nodes():
-            patch,color = self.get_shape(names[node], pos[node])
+            patch,color = self.get_shape(names[node], pos[node], direction, axis)
             patches.append(patch)
             colors.append(color)
         p = PatchCollection(patches, zorder = 3) 

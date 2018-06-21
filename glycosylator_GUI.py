@@ -89,6 +89,7 @@ class GlycosylatorGUI(tk.Tk):
         self.original_glycanMolecule = {}
         self.linked_glycans = {}
         self.linked_glycanMolecules = {}
+        self.names = {}
 
         #create root window
         tk.Tk.__init__(self)
@@ -100,7 +101,6 @@ class GlycosylatorGUI(tk.Tk):
         inw = self.winfo_screenmmwidth() * mm2in
         #DPI is usually overestimated by about 30% for an unknown reason
         self.dpi = int(pxw/inw*.65)
-        print self.dpi
         #self.resizable(False, False)
         self.protocol('WM_DELETE_WINDOW', self.save_before_close)
         # Create menubar
@@ -129,11 +129,12 @@ class GlycosylatorGUI(tk.Tk):
         # Create widget for left frame
         self.v_scrollbar = tk.Scrollbar(self.left_frame, orient = 'vertical')
         self.h_scrollbar = tk.Scrollbar(self.left_frame, orient = 'horizontal')
-        self.glycoprotein_2D = tk.Canvas(self.left_frame, width= 250, height = 500, bg = 'red')
+        self.glycoprotein_2D = tk.Canvas(self.left_frame, width= 250, height = 500, bg = 'white', scrollregion=(0, 0, 400, 800))
         self.glycoprotein_2D.configure(yscrollcommand = self.v_scrollbar.set)
         self.glycoprotein_2D.configure(xscrollcommand = self.h_scrollbar.set)
         self.v_scrollbar.config(command = self.glycoprotein_2D.yview)
         self.h_scrollbar.config(command = self.glycoprotein_2D.xview)
+
         self.detach_button = tk.Button(self.left_frame, command = self.detach_plot)
         self.detach_icon = tk.PhotoImage(file="icons/detach.gif")
         self.detach_button.config(image = self.detach_icon)
@@ -145,19 +146,19 @@ class GlycosylatorGUI(tk.Tk):
 
 
         # Create widget for right frame       
-        self.glycosylator_logo = tk.PhotoImage(file="glycosylator_logo.gif")
+        self.glycosylator_logo = tk.PhotoImage(file="icons/glycosylator_logo.gif")
         self.w_logo = tk.Label(self.right_frame, image=self.glycosylator_logo)
-        self.chain_label = tk.Label(self.right_frame, text="Chain:")
+        self.chain_label = tk.Label(self.right_frame, text="Chain:", bg = 'white')
         options = ['-']
         self.chain = tk.StringVar(self.right_frame)
         self.chain_menu = tk.OptionMenu(self.right_frame, self.chain, *options, command = self.update_sequons)
         self.chain_menu.configure(state="disabled")
-        self.sequon_label = tk.Label(self.right_frame, text="Sequon:")
+        self.sequon_label = tk.Label(self.right_frame, text="Sequon:", bg = 'white')
         self.sequon = tk.StringVar(self.right_frame)
         self.sequon_menu = tk.OptionMenu(self.right_frame, self.sequon, *options)
         self.sequon_menu.configure(state="disabled")
-        self.glycan_label = tk.Label(self.right_frame, text="Click to modify glycan")
-        self.glycan_2D = tk.Canvas(self.right_frame, width = 150, height = 150, bg = 'red')
+        self.glycan_label = tk.Label(self.right_frame, text="Click to modify glycan", bg = 'white')
+        self.glycan_2D = tk.Canvas(self.right_frame, width = 150, height = 150, bg = 'white')
         self.glycan_2D.bind("<Button-1>", self.database_window)
         self.glycosylate_button = tk.Button(self.right_frame, text="Glycosylate", command = self.glycosylate)
         self.glycosylateAll_button = tk.Button(self.right_frame, text="Glycosylate all")
@@ -174,7 +175,8 @@ class GlycosylatorGUI(tk.Tk):
         self.glycosylate_button.grid(column = 0, row =  i); i+=1
         self.glycosylateAll_button.grid(column = 0, row =  i); i+=1
         self.clashes.grid(column = 0, row =  i); i+=1 
-    
+
+
     def save_before_close(self):
         if self.db_window:
             self.db_window.destroy()
@@ -191,8 +193,10 @@ class GlycosylatorGUI(tk.Tk):
 
         l = len(self.myGlycosylator.sequences[chid])
         sequons = [k for k in self.myGlycosylator.sequons.keys() if chid in k[:len(chid)]]
+        trees = self.myGlycosylator.glycans
+        trees.update(self.linked_glycans)
         self.myDrawer.draw_glycoprotein(l, self.myGlycosylator.get_start_resnum(chid), sequons, ax = ax, axis = 0,
-                trees = self.myGlycosylator.glycans, names = self.myGlycosylator.names, sequon_color = self.sequon_colors)
+                trees = trees, names = self.names, sequon_color = self.sequon_colors)
         ax.axis('equal')
         ax.axis('off')
 
@@ -243,7 +247,7 @@ class GlycosylatorGUI(tk.Tk):
             root,tree =  self.original_glycans[sequon]
         else:
             return 0
-        self.myDrawer.draw_tree(tree, root, self.myGlycosylator.names, root_pos = [0, 0], direction = 1, ax = ax, axis = 0)
+        self.myDrawer.draw_tree(tree, root, self.names, root_pos = [0, 0], direction = 1, ax = ax, axis = 0)
         ax.axis('equal')
         ax.axis('off')
         ax.set_ylim((-3, 6))
@@ -272,9 +276,13 @@ class GlycosylatorGUI(tk.Tk):
             chid =  chid.get()
 
         l = len(self.myGlycosylator.sequences[chid])
+        
+        trees = self.myGlycosylator.glycans
+        trees.update(self.linked_glycans)
+         
         sequons = [k for k in self.myGlycosylator.sequons.keys() if chid in k[:len(chid)]]
         self.myDrawer.draw_glycoprotein(l, self.myGlycosylator.get_start_resnum(chid), sequons, ax = ax, axis = 1,
-                trees = self.myGlycosylator.glycans, names = self.myGlycosylator.names)
+                trees = trees, names = self.names)
         ax.axis('equal')
         ax.axis('off')
         figure_canvas_agg = FigureCanvasAgg(fig)
@@ -299,6 +307,8 @@ class GlycosylatorGUI(tk.Tk):
         self.myGlycosylator.load_glycoprotein(filename)
         self.original_glycansMolecules = self.myGlycosylator.glycanMolecules.copy()
         self.original_glycans = self.myGlycosylator.glycans.copy()
+        self.names = self.myGlycosylator.names
+
         chids = self.myGlycosylator.sequences.keys()
         self.chain_menu['menu'].delete(0, 'end')
         self.chain.set(chids[0])
@@ -324,9 +334,7 @@ class GlycosylatorGUI(tk.Tk):
         filename = tkFileDialog.asksaveasfilename(initialdir = self.cwd, defaultextension=".pdb", filetypes = (("pdb files","*.pdb"),("all files","*.*"))) 
         if filename is None:
             return
-        print filename
-        self.myGlycosylator.glycanMolecules = self.linked_glycanMolecules
-        print self.linked_glycans
+        self.myGlycosylator.glycans.update(self.linked_glycans)
         self.myGlycosylator.save_glycoprotein(filename)
 
 
@@ -342,21 +350,8 @@ class GlycosylatorGUI(tk.Tk):
             self.selection = None
         self.db_window.withdraw()
         if self.selected_glycan:
-            key = self.sequon.get()
-            self.myGlycosylator.connect_topology['SELECTED'] = self.selected_glycan[1]
-            residue = self.myGlycosylator.get_residue(key)
-            original_glycan = None
-            connect_tree = None 
-            #if key in self.original_glycans:
-            #    connect_tree = 
-            #    original_glycan = self.original_glycans[key]
-            glycan,bonds = self.myGlycosylator.glycosylate('SELECTED', 
-                                                            template_glycan_tree = connect_tree, 
-                                                            template_glycan = original_glycan,
-                                                            link_residue=residue, link_patch = 'NGLB')
-            new_glycan = glc.Molecule('New')
-            new_glycan.set_AtomGroup(glycan, bonds = bonds)
-            self.linked_glycans[key] = new_glycan
+            root,tree,names = self.build_glycan_tree(self.selected_glycan[1]['UNIT'])
+            self.glycan_image = self.draw_glycan_in_canvas(self.glycan_2D, tree, root, names)
  
     def select_glycan(self, event = None):
         if not self.selected_glycan:
@@ -379,7 +374,7 @@ class GlycosylatorGUI(tk.Tk):
         self.db_window.bind('<Return>', self.select_glycan)
         self.tab_control = ttk.Notebook(self.db_window)
         self.tb_commong = tk.Frame(self.tab_control)
-        self.tb_userg = tk.Frame(self.tab_control)
+        self.tb_userg = tk.Frame(self.tab_control )
         self.tab_control.add(self.tb_commong, text='Common glycans')
         self.tab_control.add(self.tb_userg, text='My glycans')
         self.db_ok = tk.Button(self.db_window, text='OK', command = self.select_glycan)
@@ -390,7 +385,7 @@ class GlycosylatorGUI(tk.Tk):
         self.db_ok.grid(column = 1, row = 1, sticky ='E')
 
         #common glycans tab
-        self.canvas_commong = tk.Canvas(self.tb_commong)
+        self.canvas_commong = tk.Canvas(self.tb_commong, scrollregion=(0, 0, 1000, 2000))
         self.v_sb_cg = tk.Scrollbar(self.tb_commong, orient = 'vertical', command = self.canvas_commong.yview)
         self.canvas_commong.config(yscrollcommand = self.v_sb_cg.set)
         self.canvas_commong.grid(column = 0, row = 0)
@@ -404,7 +399,7 @@ class GlycosylatorGUI(tk.Tk):
             self.display_db(self.canvas_commong, self.common_glycans, self.common_images, self.common_canvas, self.common_names)
 
         #user glycans tab
-        self.canvas_userg = tk.Canvas(self.tb_userg)
+        self.canvas_userg = tk.Canvas(self.tb_userg, scrollregion=(0, 0, 1000, 2000))
         self.v_sb_ug = tk.Scrollbar(self.tb_userg, orient = 'vertical', command = self.canvas_userg.yview)
         self.canvas_userg.config(yscrollcommand = self.v_sb_ug.set)
         self.ug_button_frame = tk.Frame(self.tb_userg)
@@ -596,7 +591,8 @@ class GlycosylatorGUI(tk.Tk):
         cursor =  conn.cursor()
         tn = 'glycans'
         gn = 'glycan_name'
-        gt = 'glycan_tree'
+        
+        self.selected_glycan[1] = 'glycan_tree'
         cursor.execute("DROP TABLE IF EXISTS {tn}".format(tn = tn))
         cursor.execute("CREATE TABLE {tn} ({gn} text, {gt} text)".format(tn =  tn, gn = gn, gt = gt))
 
@@ -624,13 +620,59 @@ class GlycosylatorGUI(tk.Tk):
         self.new_connect_top = {}
         self.add_window = tk.Toplevel(self)
         self.add_window.wm_title("Add glycan")
+        #Labels
+        tk.Label(self.add_window, text = 'File: ').grid(row = 0, column =  0, sticky = 'W')
+        tk.Label(self.add_window, text = 'Glycan Name: ').grid(row = 1, column = 0, sticky = 'W')
+        tk.Label(self.add_window, text = 'Structure: ').grid(row = 2, column = 0, sticky = 'W')
+        #
+        self.glycan_name_entry = tk.Entry(self.add_window)
+        self.choose_file = tk.Button(self.add_window, text = 'Choose file', command = self.get_connect_topology)
+        self.structure_entry = tk.Entry(self.add_window, state = 'disable')
+        self.glycan_canvas = tk.Canvas(self.add_window, width =  100, height =  100)
+        self.cancel_glycan_button =  tk.Button(self.add_window, text = 'Cancel', command = self.add_window.destroy)
+        self.add_glycan_button = tk.Button(self.add_window, text = 'Add glycan', command = self.add_glycan)
+        #Pack
+        self.choose_file.grid(row = 0, column = 1, sticky = 'E')
+        self.glycan_name_entry.grid(row = 1, column = 1, sticky = 'E')
+        self.structure_entry.grid(row = 2, column = 1, sticky = 'E')
+        self.glycan_canvas.grid(row = 0, column = 2, rowspan = 3, columnspan = 2)
+        self.cancel_glycan_button.grid(row = 3, column = 2)
+        self.add_glycan_button.grid(row = 3, column = 3)
+
+#    def close_add(self):
+
 
     def add_glycan(self):
         """Add new glycan to user's database
 
         """
-        self.user_glycans[self.new_name] = self.new_connect_top
+        self.user_glycans[self.glycan_name_entry.get()] = self.new_connect_top
+        self.add_window.destroy()
+        self.user_images = []
+        self.user_canvas = []
+        self.user_names = []
+        if self.user_glycans:
+            self.display_db(self.canvas_userg, self.user_glycans, self.user_images, self.user_canvas, self.user_names)
         
+    def draw_glycan_in_canvas(self, canvas, tree, root, names, h = 100., w = 100.):
+            fig = mpl.figure.Figure(figsize=(h/self.dpi, w/self.dpi))
+            ax = fig.add_subplot(111)
+            
+            self.myDrawer.draw_tree(tree, root, names, root_pos = [0, 0], direction = 1, ax = ax, axis = 0)
+            ax.axis('equal')
+            ax.axis('off')
+            ax.set_ylim((-1, 6))
+            ax.set_xlim((-3, 3))
+
+            # Add to tk window
+            figure_canvas_agg = FigureCanvasAgg(fig)
+            figure_canvas_agg.draw()
+            figure_x, figure_y, figure_w, figure_h = fig.bbox.bounds
+            figure_w, figure_h = int(figure_w), int(figure_h)
+            glycan_image = tk.PhotoImage(master = canvas, width=figure_w, height=figure_h)
+            canvas.create_image(figure_w/2, figure_h/2, image = glycan_image)
+            tkagg.blit(glycan_image, figure_canvas_agg.get_renderer()._renderer, colormode=2)
+            return glycan_image
 
     def get_connect_topology(self):
         """Dialog window for selecting new glycan. Can be either pdb or topology file
@@ -639,13 +681,68 @@ class GlycosylatorGUI(tk.Tk):
         filename = tkFileDialog.askopenfilename(initialdir = self.cwd, title = "Select glycan library", filetypes = (("pdb files","*.pdb"), ("topology file", "*.top"), ("all files","*.*")))
         if not filename:
             return -1
+        path, file_extension = os.path.splitext(filename)
 
-        glycan = glc.Molecule('glycan')
-        glycan.read_molecule_from_PDB(filename)
-        myGlycosylator.assign_patches(glycan)
-        self.new_connect_top = yGlycosylator.build_connect_topology(glycan)
-        self.new_connect_tree 
+        if file_extension == '.pdb':
+            glycan = glc.Molecule('glycan')
+            glycan.read_molecule_from_PDB(filename, update_bonds = False)
+            self.myGlycosylator.assign_patches(glycan)
+            connect_tree = self.myGlycosylator.build_connect_topology(glycan)
+            self.new_connect_top = self.connect_tree_to_topology(connect_tree)
+        elif file_extension == '.top':
+            name,self.new_connect_top = self.read_connect_topology(filename)
+            print self.new_connect_top
+            self.glycan_name_entry.insert(0, name)
 
+        root,tree,names = self.build_glycan_tree(self.new_connect_top['UNIT'])
+        self.new_glycan_image = self.draw_glycan_in_canvas(self.glycan_canvas, tree, root, names, h = 70., w = 70.)
+        self.structure_entry.configure(state='normal')
+        self.structure_entry.delete(0, tk.END)
+        self.structure_entry.insert(0, self.myDrawer.tree_to_text(tree, root, names, visited = []))
+        self.structure_entry.configure(state='disabled')
+    
+    def read_connect_topology(self, filename):
+        """Reads glycan topology from text file
+
+        """
+        lines = glc.readLinesFromFile(filename)
+        residue = {}
+        nbr_units = 0
+        for line in lines:                                                             # Loop through each line 
+            line = line.split('\n')[0].split('!')[0].split() #remove comments and endl
+            if line:
+                if line[0] == 'RESI':    
+                    residue['UNIT'] = []
+                    resname = line[1]
+                    nbr_units = 0
+                elif line[0] == 'UNIT':
+                    self.read_unit(line, residue)
+                    nbr_units += 1
+        residue['#UNIT'] = nbr_units
+        return resname,residue
+    
+    def read_unit(self, unit, residue):
+        if len(unit)>2:
+            residue['UNIT'].append([unit[1], unit[2], unit[3:]])
+        else:
+            residue['UNIT'].append([unit[1], '', []])
+
+
+    def connect_tree_to_topology(self, connect_tree):
+        connect_topology = {}
+        units = connect_tree['UNIT']
+        unit_list = []
+        n_unit = 0
+        for unit in units:
+            unit = filter(None, unit.split(' '))
+            n_unit +=1
+            if len(unit) > 1:
+                unit_list.append([unit[0], 'C1', unit[1:]])
+            else:
+                unit_list.append([unit[0], '', []])
+        connect_topology['UNIT'] = unit_list
+        connect_topology['#UNIT'] = n_unit
+        return connect_topology
 
     def delete_glycan(self):
         """Delete glycan from database
@@ -658,7 +755,7 @@ class GlycosylatorGUI(tk.Tk):
         self.canvas_userg.delete(all)
         self.user_images = []
         self.user_canvas = []
-        self.display_db(self.canvas_userg, self.user_glycans, self.user_images, self.user_canvas)
+        self.display_db(self.canvas_userg, self.user_glycans, self.user_images, self.user_canvas, self.user_names)
     
     def glycosylate(self):
         """ Glycosylate sequon with chosen glycan
@@ -667,11 +764,38 @@ class GlycosylatorGUI(tk.Tk):
         chid = self.chain.get()
         sequon = self.sequon.get()
         self.sequon_colors[sequon] = [.7, .1, 0]
+        key = self.sequon.get()
+        residue = self.myGlycosylator.get_residue(key)
+        #Build new glycan
+        if self.selected_glycan:
+            self.myGlycosylator.connect_topology['SELECTED'] = self.selected_glycan[1]
+            original_glycan = None
+            connect_tree = None 
+        #Use current glycan
+        else:
+            original_glycan = self.original_glycan[key]
+            connect_tree = self.myGlycosylator(original_glycan) 
+            self.myGlycosylator.connect_topology['SELECTED'] = self.connect_tree_to_topology(connect_tree) 
+
+        #if key in self.original_glycans:
+        #    connect_tree = 
+        #    original_glycan = self.original_glycans[key]
+        glycan,bonds = self.myGlycosylator.glycosylate('SELECTED', 
+                                                        template_glycan_tree = connect_tree, 
+                                                        template_glycan = original_glycan,
+                                                        link_residue=residue, link_patch = 'NGLB')
+        new_glycan = glc.Molecule(key)
+        new_glycan.set_AtomGroup(glycan, bonds = bonds)
+        self.linked_glycanMolecules[key] = new_glycan
+        self.linked_glycans[key] = [new_glycan.rootRes, new_glycan.interresidue_connectivity]
+        self.names.update(new_glycan.get_names())
+        # Update glycoprotein and sequon panels
         self.draw_glycoprotein(chid)
-	self.draw_glycan(sequon)
+        self.draw_glycan(sequon)
 
     def set_propreties(self):
         pass
+
 if __name__ == "__main__":
     glycogui = GlycosylatorGUI()
     glycogui.mainloop()
