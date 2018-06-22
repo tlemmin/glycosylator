@@ -67,6 +67,21 @@ class CreateToolTip(object):
             self.tw.destroy()
 
 class GlycosylatorGUI(tk.Tk):
+    """ This Class creates the graphical interface for glycosylator. It is composted of a main window.
+    In addition, it will create one window for the displaying the database (db_window) and one for uploading a new glycan
+    Variables:
+        myGlycosylator: glycosylator instance (for identifying and building glycans)
+        myDrawer: drawer instance (for displaying glycoprotien and glycans)
+        user_glycans: dictionary of glycans defined by user. Glycan name as a key and glycan topology as a value
+        common_glycans: dictionary of common glycans. Glycan name as a key and glycan topology as a value
+        db_window: database window
+        selected_glycan: glycan selected by the user
+        original_glycans: dictionary of glycans detected in the original glycoprotein. Sequon as a key and glycan tree as a value
+        original_glycanMolecules: dictionary of glycans Molecules. Sequon as key and Molecule instance as value
+        linked_glycans:  dictionary of built-in glycans. Sequon as a key and glycan tree as a value
+        linked_glycanMolecules: dictionary of built-in glycans Molecules. Sequon as key and Molecule instance as value
+        names: dictionary of glycan residue name. Residue id as key and resname as value
+    """
 
     def __init__(self):
         self.cwd = os.getcwd()
@@ -86,7 +101,7 @@ class GlycosylatorGUI(tk.Tk):
         #bookkeeping
         self.sequon_colors = {}
         self.original_glycans = {}
-        self.original_glycanMolecule = {}
+        self.original_glycanMolecules = {}
         self.linked_glycans = {}
         self.linked_glycanMolecules = {}
         self.names = {}
@@ -109,6 +124,7 @@ class GlycosylatorGUI(tk.Tk):
         self.file_menu = tk.Menu(self.menubar, tearoff=0, bg="lightgrey", fg="black") 
         self.file_menu.add_command(label="Open glycoprotein", accelerator = "Ctrl+O", command = self.load_glycoprotein) 
         self.file_menu.add_command(label="Save glycoprotein", accelerator = "Ctrl+S", command = self.save_glycoprotein) 
+        self.file_menu.add_command(label="Export patches", accelerator = "Ctrl+P", command = self.save_patches) 
         self.file_menu.add_command(label="Propreties", command = self.set_propreties) 
         self.menubar.add_cascade(label="File", menu=self.file_menu)
         self.config(menu=self.menubar)
@@ -178,6 +194,8 @@ class GlycosylatorGUI(tk.Tk):
 
 
     def save_before_close(self):
+        """Do some clean up before destroying main window
+        """
         if self.db_window:
             self.db_window.destroy()
         self.destroy()
@@ -304,11 +322,16 @@ class GlycosylatorGUI(tk.Tk):
         filename = tkFileDialog.askopenfilename(initialdir = self.cwd, title = "Select glycoprotein", filetypes = (("pdb files","*.pdb"),("all files","*.*"))) 
         if not filename:
             return -1
+        #Clear previous variable
+        self.linked_glycans = {}
+        self.linked_glycanMolecules = {}
+        #Load new glycoprotein and extract glycans
         self.myGlycosylator.load_glycoprotein(filename)
         self.original_glycansMolecules = self.myGlycosylator.glycanMolecules.copy()
         self.original_glycans = self.myGlycosylator.glycans.copy()
         self.names = self.myGlycosylator.names
-
+        
+        #Update the option menus
         chids = self.myGlycosylator.sequences.keys()
         self.chain_menu['menu'].delete(0, 'end')
         self.chain.set(chids[0])
@@ -339,11 +362,15 @@ class GlycosylatorGUI(tk.Tk):
 
 
     def show_database(self):
+        """Make database window visible again
+        """
         self.db_window.update()
         self.db_window.deiconify()
         self.selected_glycan =  None
 
     def hide_database(self):
+        """Hide database window
+        """
         if self.selected_canvas:
             self.selected_canvas.delete(self.selection)
             self.selected_canvas = None
@@ -354,6 +381,8 @@ class GlycosylatorGUI(tk.Tk):
             self.glycan_image = self.draw_glycan_in_canvas(self.glycan_2D, tree, root, names)
  
     def select_glycan(self, event = None):
+        """ Check if a glycan has been selected
+        """
         if not self.selected_glycan:
             tkMessageBox.showerror("Error", "Please select a glycan")
         else:
@@ -362,7 +391,7 @@ class GlycosylatorGUI(tk.Tk):
 
     def database_window(self, event=None):
         """Window with all databases (common and user defined)
-           -Notebook with two tabs
+           -Notebook with two tabs: one for common glycans and one for user's
         """
         if self.db_window:
             self.show_database()
@@ -436,6 +465,15 @@ class GlycosylatorGUI(tk.Tk):
             self.display_db(self.canvas_userg, self.user_glycans, self.user_images, self.user_canvas, self.user_names)
 
     def display_db(self, master, glycans, glycan_images, glycan_canvas, glycan_ttp):
+        """Generates thumbnail images for all glycans in a database
+        Parameters:
+            master: master Canvas for drawing
+            glycans: dictionary of glycans. Names as keys and connectivity topology as values
+            glycan_images: list for storing generated images
+            glycan_canvas: list for storing generated canvas
+            glycan_ttp: list for storing labels for each glycan
+
+        """
         i = 0
         j = 0
         counter = 0
@@ -504,7 +542,11 @@ class GlycosylatorGUI(tk.Tk):
 
     def clicked_glycan(self, event):
         """Determines which glycan has been selected from database
-        The glycan will be highlighted with a red rectangle
+        The glycan will be highlighted with a red rectangle.
+        Initializes:
+            selection: rectangle around the canvas
+            selected_canvas: selected canvas
+            selected_glycan: item form glycan dictionary (Key: name, Value: glycan connect topology)
         """
         #tab  = self.tab_control.tab(self.tab_control.select(), "text")
         tab  = self.tab_control.index(self.tab_control.select())
@@ -525,7 +567,7 @@ class GlycosylatorGUI(tk.Tk):
 
     def import_library(self):
         """ Opens dialog for user to import their library
-        Update the database windows, it has already been created.
+        Update the database windows, if it has already been created.
         """
         filename = tkFileDialog.askopenfilename(initialdir = self.cwd, title = "Select glycan library", filetypes = (("db files","*.db"),("all files","*.*")))
         if not filename:
@@ -581,7 +623,7 @@ class GlycosylatorGUI(tk.Tk):
     
     def export_glycans(self, filename, connect_topology):
         """Export connectivity topology to sql database
-        This function will 
+        This function will export a SQL database with all the user glycans.
         """
         try:
             conn = sqlite3.connect(filename)
@@ -655,6 +697,17 @@ class GlycosylatorGUI(tk.Tk):
             self.display_db(self.canvas_userg, self.user_glycans, self.user_images, self.user_canvas, self.user_names)
         
     def draw_glycan_in_canvas(self, canvas, tree, root, names, h = 100., w = 100.):
+        """ Draws a glycan on to a canvas
+            Parameters:
+                canvas: tk.Canvas where the image should be drawn
+                tree: tree representation of the glycan
+                root: id of root node in tree
+                names: dictionary with node id as keys and resname as values
+                h: height of figure in px
+                w: width of figure in px
+            Returns:
+                glycan_image: image instance. This should be saved otherwise the image will be destroyed, thus not displayed.
+        """
             fig = mpl.figure.Figure(figsize=(h/self.dpi, w/self.dpi))
             ax = fig.add_subplot(111)
             
@@ -702,8 +755,10 @@ class GlycosylatorGUI(tk.Tk):
         self.structure_entry.configure(state='disabled')
     
     def read_connect_topology(self, filename):
-        """Reads glycan topology from text file
-
+        """Reads glycan connect topology from text file
+        Returns:
+            resname: name of glycan
+            residue: dictionary with connect topology
         """
         lines = glc.readLinesFromFile(filename)
         residue = {}
@@ -722,6 +777,8 @@ class GlycosylatorGUI(tk.Tk):
         return resname,residue
     
     def read_unit(self, unit, residue):
+        """Reads an unit in glycan connect topology
+        """
         if len(unit)>2:
             residue['UNIT'].append([unit[1], unit[2], unit[3:]])
         else:
@@ -729,6 +786,9 @@ class GlycosylatorGUI(tk.Tk):
 
 
     def connect_tree_to_topology(self, connect_tree):
+        """Converts a connect tree to a connect topology
+           In connect tree the connectivity is represented as a string whereas it is a list in connect topology
+        """
         connect_topology = {}
         units = connect_tree['UNIT']
         unit_list = []
@@ -759,7 +819,7 @@ class GlycosylatorGUI(tk.Tk):
     
     def glycosylate(self):
         """ Glycosylate sequon with chosen glycan
-     
+        
         """
         chid = self.chain.get()
         sequon = self.sequon.get()
@@ -794,8 +854,13 @@ class GlycosylatorGUI(tk.Tk):
         self.draw_glycan(sequon)
 
     def set_propreties(self):
+        """Allows user to ajust parameters to improve the rendering of the GUI (size and resolution)
+        """
         pass
-
+    def export_patches(self):
+        """Exports a configuration file for CHARMM with all the patches that have to be applied in order to build glycans.
+        """
+        pass
 if __name__ == "__main__":
     glycogui = GlycosylatorGUI()
     glycogui.mainloop()
