@@ -558,9 +558,13 @@ class Molecule:
             Returns:
                 names: dictionary with residue id (get_id) as keys and residue name as value
         """
-        kd = KDTree(self.atom_group.getCoords())
-        kd.search(1.7)
-        atoms = kd.getIndices()
+        if not self.bonds:
+            kd = KDTree(self.atom_group.getCoords())
+            kd.search(1.7)
+            atoms = kd.getIndices()
+        else:
+            atoms = np.array(self.bonds) - 1
+            
         atom_names = self.atom_group.getNames()
         ids,rn = self.get_ids(self.atom_group)
         G = nx.Graph()
@@ -2018,6 +2022,26 @@ class Glycosylator:
                         atom_type[cur_atom_serial[an[1:]]] = {'name': an[1:], 'type': a[1], 'charge': a[2], 'id':current+','+an[1:], 'element': masses[a[1]][-1]}
         return atom_type
 
+    def export_patches(self, glycans):
+        """Creates list of patches for parameter file for psfgen.
+        Parameters:
+            glycans: dictionary of glycans with sequon as key and glycan tree as values
+        Returns:
+            patches: list of patches
+        """
+        patches = []
+        for k in glycans:
+            root, tree = glycans[k]
+            seg1,chid1,res1,i = k.split(',')
+            seg2,chid2,res2,i = root.split(',')
+            patches.append('patch {} {}:{} {}:{}'.format('NGLB', seg1, res1, seg2, res2))
+
+            for e1,e2 in tree.edges():
+                link = tree[e1][e2]['patch']
+                seg1,chid1,res1,i = e1.split(',')
+                seg2,chid2,res2,i = e2.split(',')
+                patches.append('patch {} {}:{} {}:{}'.format(link, seg1, res1, seg2, res2))
+        return patches
 
 #####################################################################################
 #                                Sampler                                            #
