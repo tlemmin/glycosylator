@@ -87,8 +87,9 @@ class GlycosylatorGUI(tk.Tk):
         tk.Tk.__init__(self)
         self.title('Glycosylator')
         self.geometry('520x520')
+        self.configure(background='white')
         #self.option_readfile('optionDB')
-        Pmw.initialise()
+        Pmw.initialise(self)
         #Pmw.aboutversion('2.0')
         #Pmw.aboutcopyright('This program is free software: you can redistribute it and/or modifiy \nit under the terms of the GNU General Public License as published by the Free Software Foundation,\n either version 3 of the License, or any later version.')
         #Pmw.aboutcontact('')
@@ -110,7 +111,7 @@ class GlycosylatorGUI(tk.Tk):
         self.file_menu.add_command(label="Open glycoprotein", accelerator = "Ctrl+O", command = self.load_glycoprotein) 
         self.file_menu.add_command(label="Save glycoprotein", accelerator = "Ctrl+S", command = self.save_glycoprotein) 
         self.file_menu.add_command(label="Export patches", accelerator = "Ctrl+P", command = self.export_patches) 
-        self.file_menu.add_command(label="Propreties", command = self.set_propreties) 
+        #self.file_menu.add_command(label="Propreties", command = self.set_propreties) 
         self.menubar.add_cascade(label="File", menu=self.file_menu)
         self.config(menu=self.menubar)
         # glycan menu
@@ -121,63 +122,82 @@ class GlycosylatorGUI(tk.Tk):
 
         self.config(menu=self.menubar)
         
+        #allow for window to expand
+        self.columnconfigure(0, weight=6)
+        self.rowconfigure(0, weight=6)
+        
         # Create and layout main frames
         self.left_frame = tk.Frame(self, width = 250, height = 500, bg = 'white')
         self.right_frame = tk.Frame(self, width = 250, height = 500, bg = 'white')
-        self.left_frame.grid(column=0, row=0)
+        self.left_frame.grid(column=0, row=0, sticky='NSEW')
         self.right_frame.grid(column=1, row=0)
         
         # Create widget for left frame
         self.v_scrollbar = tk.Scrollbar(self.left_frame, orient = 'vertical')
         self.h_scrollbar = tk.Scrollbar(self.left_frame, orient = 'horizontal')
-        self.glycoprotein_2D = tk.Canvas(self.left_frame, width= 250, height = 500, bg = 'white', scrollregion=(0, 0, 400, 800))
+        self.glycoprotein_2D = tk.Canvas(self.left_frame, width = 250, height = 500, bg = 'white', scrollregion=(0, 0, 400, 2000))
         self.glycoprotein_2D.configure(yscrollcommand = self.v_scrollbar.set)
         self.glycoprotein_2D.configure(xscrollcommand = self.h_scrollbar.set)
         self.v_scrollbar.config(command = self.glycoprotein_2D.yview)
         self.h_scrollbar.config(command = self.glycoprotein_2D.xview)
+        
+        self.glycoprotein_2D.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.glycoprotein_2D.bind_all("<Button-4>", self._on_mousewheel)
+        self.glycoprotein_2D.bind_all("<Button-5>", self._on_mousewheel)
 
         self.detach_button = tk.Button(self.left_frame, command = self.detach_plot)
         self.detach_icon = tk.PhotoImage(file="icons/detach.gif")
         self.detach_button.config(image = self.detach_icon)
         #Layout left frame
-        self.glycoprotein_2D.grid(column = 0, row= 0)
+        self.glycoprotein_2D.grid(column = 0, row= 0, sticky='NSEW')
         self.detach_button.grid(column = 0, row= 0, sticky='SE')
         self.v_scrollbar.grid(column = 1, row = 0, sticky='NS')
         self.h_scrollbar.grid(column = 0, row = 1, sticky='EW')
-
+        self.left_frame.columnconfigure(0, weight=6)
+        self.left_frame.rowconfigure(0, weight=6)
 
         # Create widget for right frame       
         self.glycosylator_logo = tk.PhotoImage(file="icons/glycosylator_logo.gif")
-        self.w_logo = tk.Label(self.right_frame, image=self.glycosylator_logo)
+        self.w_logo = tk.Label(self.right_frame, image=self.glycosylator_logo, bg = 'white')
         self.chain_label = tk.Label(self.right_frame, text="Chain:", bg = 'white')
         options = ['-']
         self.chain = tk.StringVar(self.right_frame)
         self.chain_menu = tk.OptionMenu(self.right_frame, self.chain, *options, command = self.update_sequons)
+        self.chain_menu.config(width = 10)
         self.chain_menu.configure(state="disabled")
         self.sequon_label = tk.Label(self.right_frame, text="Sequon:", bg = 'white')
         self.sequon = tk.StringVar(self.right_frame)
         self.sequon_menu = tk.OptionMenu(self.right_frame, self.sequon, *options)
+        self.sequon_menu.config(width = 10)
         self.sequon_menu.configure(state="disabled")
         self.glycan_label = tk.Label(self.right_frame, text="Click to modify glycan", bg = 'white')
         self.glycan_2D = tk.Canvas(self.right_frame, width = 150, height = 150, bg = 'white')
         self.glycan_2D.bind("<Button-1>", self.database_window)
         self.glycan_name = Pmw.Balloon(self.right_frame)
         self.glycan_name.bind(self.glycan_2D, 'No sequon has been selected')
-        self.glycosylate_button = tk.Button(self.right_frame, text="Glycosylate", command = self.glycosylate)
-        self.glycosylateAll_button = tk.Button(self.right_frame, text="Glycosylate all")
-        self.clashes = tk.Button(self.right_frame, text="Remove clashes")
+
+        self.undo_button = tk.Button(self.right_frame, command = self.undo_glycan)
+        self.undo_icon = tk.PhotoImage(file="icons/undo.gif")
+        self.undo_button.config(image = self.undo_icon)
+        self.glycan_name.bind(self.undo_button, 'Undo glycosylation')
+        
+        self.glycosylate_button = tk.Button(self.right_frame, text="Glycosylate", command = self.glycosylate, width = 10)
+#        self.glycosylateAll_button = tk.Button(self.right_frame, text="Glycosylate all", width = 10)
+        self.clashes = tk.Button(self.right_frame, text="Remove clashes", width = 10)
         # Layout right frame       
         i = 0
-        self.w_logo.grid(column = 0, row =  i, sticky='N'); i+=1
+        self.w_logo.grid(column = 0, row =  i, sticky='N', pady=(1, 65)); i+=1
+        self.right_frame.rowconfigure(0, weight = 1)
         self.chain_label.grid(column = 0, row =  i, sticky='W'); i+=1
         self.chain_menu.grid(column = 0, row =  i); i+=1
         self.sequon_label.grid(column = 0, row =  i, sticky='W'); i+=1
         self.sequon_menu.grid(column = 0, row =  i); i+=1
         self.glycan_label.grid(column = 0, row =  i, sticky='W'); i+=1
-        self.glycan_2D.grid(column = 0, row =  i); i+=1
-        self.glycosylate_button.grid(column = 0, row =  i); i+=1
-        self.glycosylateAll_button.grid(column = 0, row =  i); i+=1
-        self.clashes.grid(column = 0, row =  i); i+=1 
+        self.glycan_2D.grid(column = 0, row =  i); 
+        self.undo_button.grid(column = 0, row =  i, sticky = 'SE', padx= (5, 10)); i+=1
+        self.glycosylate_button.grid(column = 0, row =  i, pady = (15, 2)); i+=1
+#        self.glycosylateAll_button.grid(column = 0, row =  i, pady = 2); i+=1
+        self.clashes.grid(column = 0, row =  i, pady = 2); i+=1 
 
 
     def save_before_close(self):
@@ -245,29 +265,31 @@ class GlycosylatorGUI(tk.Tk):
         # Draw protein fragment
         self.myDrawer.draw_protein_fragment(ax = ax, sequon_color = color)
         # Drawing glycan
-
+        glycan = True
         if sequon in self.linked_glycans:
             root,tree =  self.linked_glycans[sequon]
         elif sequon in self.original_glycans:
             root,tree =  self.original_glycans[sequon]
         else:
-            return 0
-        self.myDrawer.draw_tree(tree, root, self.names, root_pos = [0, 0], direction = 1, ax = ax, axis = 0)
+            self.myDrawer.draw_protein_fragment(ax = ax)
+            glycan = False
+            name = 'Structure: N/A'
+        if glycan:
+            self.myDrawer.draw_tree(tree, root, self.names, root_pos = [0, 0], direction = 1, ax = ax, axis = 0)
+            name = 'Structure: ' + self.myDrawer.tree_to_text(tree, root, self.names, visited = [])
         ax.axis('equal')
         ax.axis('off')
         ax.set_ylim((-3, 6))
         ax.set_xlim((-3, 3))
-
         # Add to tk window
         figure_canvas_agg = FigureCanvasAgg(fig)
         figure_canvas_agg.draw()
         figure_x, figure_y, figure_w, figure_h = fig.bbox.bounds
         figure_w, figure_h = int(figure_w), int(figure_h)
-        self.glycan_image = tk.PhotoImage(master=self.glycan_2D)
         self.glycan_image = tk.PhotoImage(master=self.glycan_2D, width=figure_w, height=figure_h)
         self.glycan_2D.create_image(figure_w/2, figure_h/2, image=self.glycan_image)
         self.glycan_name.tagunbind(self.right_frame, self.glycan_2D)
-        self.glycan_name.bind(self.glycan_2D, 'Strucutre: ' + self.myDrawer.tree_to_text(tree, root, self.names, visited = []))
+        self.glycan_name.bind(self.glycan_2D, name)
         tkagg.blit(self.glycan_image, figure_canvas_agg.get_renderer()._renderer, colormode=2)
         
     def draw_glycoprotein(self, chid):
@@ -276,7 +298,7 @@ class GlycosylatorGUI(tk.Tk):
         Parameters:
             chid: chain id (string or handle)
         """
-        fig = mpl.figure.Figure(figsize=(250/self.dpi, 500/self.dpi)) 
+        fig = mpl.figure.Figure(figsize=(300/self.dpi, 1000/self.dpi), dpi = 100) 
         ax = fig.add_axes([0, 0, 1, 1])
 
         if type(chid) is not str:
@@ -385,49 +407,63 @@ class GlycosylatorGUI(tk.Tk):
         if self.db_window:
             self.show_database()
             return -1
+#        self.db_window = Pmw.MegaToplevel(self)  
         self.db_window = tk.Toplevel(self)
         self.db_window.wm_title("Glycan Databases")
         self.db_window.protocol('WM_DELETE_WINDOW', self.hide_database)
         self.glycan_balloon = Pmw.Balloon(self.db_window)
+        self.db_window.columnconfigure(0, weight=1)
+        self.db_window.rowconfigure(0, weight=1)
         #tabs
         self.db_window.bind('<Return>', self.select_glycan)
         self.tab_control = ttk.Notebook(self.db_window)
-        self.tb_commong = tk.Frame(self.tab_control)
+        self.tb_commong = tk.Frame(self.tab_control, height = 200)
         self.tb_userg = tk.Frame(self.tab_control)
         self.tab_control.add(self.tb_commong, text='Common glycans')
         self.tab_control.add(self.tb_userg, text='My glycans')
-        self.db_ok = tk.Button(self.db_window, text='OK', command = self.select_glycan)
-        self.db_cancel = tk.Button(self.db_window, text='cancel', command = self.hide_database)
+        self.button_control = tk.Frame(self.db_window)
+        self.db_ok = tk.Button(self.button_control, text='OK', command = self.select_glycan)
+        self.db_cancel = tk.Button(self.button_control, text='cancel', command = self.hide_database)
         
-        self.tab_control.grid(column = 0, row = 0, columnspan=2)
-        self.db_cancel.grid(column = 1, row = 1)
-        self.db_ok.grid(column = 1, row = 1, sticky ='E')
+        self.tab_control.grid(column = 0, row = 0, sticky = 'NSEW') 
+        self.tab_control.columnconfigure(0, weight=1)
+        self.tab_control.rowconfigure(0, weight=1)
+        self.button_control.grid(column =0, row = 1, sticky = 'E')
+        self.db_cancel.grid(column = 0, row = 0, sticky = 'E')
+        self.db_ok.grid(column = 1, row = 0, sticky ='E')
 
         #common glycans tab
-        #self.canvas_commong = tk.Canvas(self.tb_commong, scrollregion=(0, 0, 300, 300))
-        #self.v_sb_cg = tk.Scrollbar(self.tb_commong, orient = 'vertical', command = self.canvas_commong.yview)
-        #self.canvas_commong.config(yscrollcommand = self.v_sb_cg.set)
-        #self.canvas_commong.grid(column = 0, row = 0)
-        #self.v_sb_cg.grid(column = 1, row = 0, sticky='NS')
-        self.canvas_commong = Pmw.ScrolledCanvas(self.tb_commong, hull_width = 300, hull_height = 300)
-        self.canvas_commong.grid(column = 0, row = 0)
+        self.v_sb_cg = tk.Scrollbar(self.tb_commong, orient = 'vertical')
+        self.canvas_commong = tk.Canvas(self.tb_commong, width=200, height = 200, scrollregion=(0, 0, 300, 1500), yscrollcommand = self.v_sb_cg.set)
+        self.v_sb_cg.config(command = self.canvas_commong.yview)
+        
+        self.canvas_commong.grid(column = 0, row = 0, sticky='NSEW')
+        self.v_sb_cg.grid(column = 1, row = 0, sticky='NS')
+        self.tb_commong.columnconfigure(0, weight=1)
+        self.tb_commong.rowconfigure(0, weight=1)
 
+        self.frame_commong = tk.Frame(self.canvas_commong)
+        self.canvas_commong.create_window((4,4), window=self.frame_commong, anchor="nw", 
+                                                  tags="self.frame_commong")
+#        self.populate(self.frame_commong)
         if not self.common_glycans:
             self.common_glycans = self.import_glycans(self.db_commong)
             self.common_images = []
             self.common_canvas = []
-            self.display_db(self.canvas_commong.interior(), self.common_glycans, self.common_images, self.common_canvas)
-        #self.canvas_commong.resizescrollregion()
-
+            self.display_db(self.frame_commong, self.common_glycans, self.common_images, self.common_canvas)
+        self.frame_commong.bind("<Configure>", self._on_frame_configure)
+        
         #user glycans tab
-        self.canvas_userg = tk.Canvas(self.tb_userg, scrollregion=(0, 0, 1000, 2000))
+        self.canvas_userg = tk.Canvas(self.tb_userg)
         self.v_sb_ug = tk.Scrollbar(self.tb_userg, orient = 'vertical', command = self.canvas_userg.yview)
         self.canvas_userg.config(yscrollcommand = self.v_sb_ug.set)
         self.ug_button_frame = tk.Frame(self.tb_userg)
-        self.canvas_userg.grid(column = 0, row = 0)
+        
+        self.tb_userg.columnconfigure(0, weight=1)
+        self.tb_userg.rowconfigure(0, weight=1)
+        self.canvas_userg.grid(column = 0, row = 0, sticky = 'NSEW')
         self.v_sb_ug.grid(column = 1, row = 0, sticky='NS')
         self.ug_button_frame.grid(column = 0, row = 1, sticky= 'SE')
-
         #add buttons for import
         self.ug_import = tk.Button(self.ug_button_frame, command = self.import_library)
         self.import_icon = tk.PhotoImage(file="icons/import.gif")
@@ -452,8 +488,26 @@ class GlycosylatorGUI(tk.Tk):
 
         self.user_images = []
         self.user_canvas = []
+
+        self.frame_userg = tk.Frame(self.canvas_userg)
+        self.canvas_userg.create_window((4,4), window=self.frame_userg, anchor="nw", 
+                                                  tags="self.frame_userg")
+        self.frame_userg.bind("<Configure>", self._on_frame_configure)
+
         if self.user_glycans:
-            self.display_db(self.canvas_userg, self.user_glycans, self.user_images, self.user_canvas)
+            self.display_db(self.frame_userg, self.user_glycans, self.user_images, self.user_canvas)
+
+    def _on_frame_configure(self, event):
+        '''Reset the scroll region to encompass the inner frame'''
+        self.canvas_commong.configure(scrollregion=self.canvas_commong.bbox("all"))
+        self.canvas_userg.configure(scrollregion=self.canvas_userg.bbox("all"))
+
+    def _on_mousewheel(self, event):
+        '''Scroll glycanprotein_2D on mouse wheel'''
+        if (event.num == 4): delta = -1 
+        elif (event.num == 5): delta = 1 
+        else: delta = event.delta 
+        self.glycoprotein_2D.yview_scroll(delta, "units")
 
     def display_db(self, master, glycans, glycan_images, glycan_canvas):
         """Generates thumbnail images for all glycans in a database
@@ -493,7 +547,8 @@ class GlycosylatorGUI(tk.Tk):
             glycan_image = tk.PhotoImage(master = canvas, width=figure_w, height=figure_h)
             canvas.create_image(figure_w/2, figure_h/2, image = glycan_image, tags = counter)
             canvas.bind("<Button-1>", self.clicked_glycan)
-            self.glycan_balloon.bind(canvas, 'Name: ' + name + '\nStrucutre: ' + self.myDrawer.tree_to_text(tree, root, names, visited = []))
+            canvas.bind("<Double-Button-1>", self.select_glycan)
+            self.glycan_balloon.bind(canvas, 'Name: ' + name + '\nStructure: ' + self.myDrawer.tree_to_text(tree, root, names, visited = []))
             tkagg.blit(glycan_image, figure_canvas_agg.get_renderer()._renderer, colormode=2)
             canvas.grid(column = j, row =  i)
             glycan_images.append(glycan_image)
@@ -552,7 +607,7 @@ class GlycosylatorGUI(tk.Tk):
         elif tab == 1:
             self.selected_canvas = self.user_canvas[idx]
             self.selected_glycan = self.user_glycans.items()[idx] 
-        self.selection = self.selected_canvas.create_rectangle(0, 0, 100, 100, outline='red', width=4)
+        self.selection = self.selected_canvas.create_rectangle(0, 0, 100, 100, outline='red', width=6)
 
 
     def import_library(self):
@@ -569,7 +624,7 @@ class GlycosylatorGUI(tk.Tk):
             self.user_images = []
             self.user_canvas = []
             self.user_names = []
-            self.display_db(self.canvas_userg, self.user_glycans, self.user_images, self.user_canvas)
+            self.display_db(self.frame_userg, self.user_glycans, self.user_images, self.user_canvas)
         
 
     def import_glycans(self, filename):
@@ -689,7 +744,7 @@ class GlycosylatorGUI(tk.Tk):
         self.user_canvas = []
         
         if self.user_glycans:
-            self.display_db(self.canvas_userg, self.user_glycans, self.user_images, self.user_canvas)
+            self.display_db(self.frame_userg, self.user_glycans, self.user_images, self.user_canvas)
         
     def draw_glycan_in_canvas(self, canvas, tree, root, names, h = 100., w = 100.):
         """ Draws a glycan on to a canvas
@@ -811,9 +866,9 @@ class GlycosylatorGUI(tk.Tk):
         self.canvas_userg.delete(all)
         self.user_images = []
         self.user_canvas = []
-        self.display_db(self.canvas_userg, self.user_glycans, self.user_images, self.user_canvas)
+        self.display_db(self.frame_userg, self.user_glycans, self.user_images, self.user_canvas)
 
-    def undo(self):
+    def undo_glycan(self):
         """ Removes built in glycan
         """
         chid = self.chain.get()
@@ -865,7 +920,7 @@ class GlycosylatorGUI(tk.Tk):
         self.draw_glycoprotein(chid)
         self.draw_glycan(sequon)
 
-    def set_propreties(self):
+    def _set_propreties(self):
         """Allows user to ajust parameters to improve the rendering of the GUI (size and resolution)
         """
         pass

@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="25"
+   height="25"
+   viewBox="0 0 25 25"
+   id="svg4145"
+   version="1.1"
+   inkscape:version="0.91 r13725"
+   sodipodi:docname="undo.svg"
+   inkscape:export-filename="/home/lemmint/Documents/glycosylator/icons/undo.png"
+   inkscape:export-xdpi="90"
+   inkscape:export-ydpi="90">
+  <defs
+     id="defs4147" />
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="22.4"
+     inkscape:cx="4.2946466"
+     inkscape:cy="11.157879"
+     inkscape:document-units="px"
+     inkscape:current-layer="layer1"
+     showgrid="false"
+     units="px"
+     inkscape:window-width="1920"
+     inkscape:window-height="1101"
+     inkscape:window-x="0"
+     inkscape:window-y="28"
+     inkscape:window-maximized="1" />
+  <metadata
+     id="metadata4150">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(0,-1027.3622)">
+    <g
+       id="g4136"
+       transform="matrix(-0.70728847,-0.70692505,0.70692505,-0.70728847,-710.88233,1783.976)">
+      <path
+         sodipodi:nodetypes="cccc"
+         inkscape:connector-curvature="0"
+         id="path4717"
+         d="m 12.958272,1030.4184 10.590543,0.1016 0.09879,10.5866 z"
+         style="fill:#333333;fill-rule:evenodd;stroke:#333333;stroke-width:1.1112144px;stroke-linecap:square;stroke-linejoin:miter;stroke-opacity:1" />
+      <rect
+         transform="matrix(0.70710421,-0.70710935,0.70710424,0.70710932,0,0)"
+         y="745.1767"
+         x="-730.54932"
+         height="0.11238807"
+         width="8.9761572"
+         id="rect4719"
+         style="fill:#333333;stroke:#333333;stroke-width:4.99966383;stroke-linecap:square;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none" />
+      <rect
+         transform="matrix(0.70710424,0.70710932,-0.70710421,0.70710935,0,0)"
+         y="733.36566"
+         x="736.18488"
+         height="0.11081675"
+         width="9.1034327"
+         id="rect4719-1"
+         style="fill:#333333;stroke:#333333;stroke-width:4.99966383;stroke-linecap:square;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none" />
+      <rect
+         transform="matrix(-0.70710421,0.70710935,-0.70710424,-0.70710932,0,0)"
+         y="-736.25604"
+         x="724.48248"
+         height="0.11238807"
+         width="8.9761572"
+         id="rect4719-1-2"
+         style="fill:#333333;stroke:#333333;stroke-width:4.99966383;stroke-linecap:square;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none" />
+    </g>
+  </g>
+</svg>
