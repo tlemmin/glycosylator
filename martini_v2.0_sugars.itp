@@ -1,0 +1,650 @@
+;;;;;; CARBOHYDRATES, COMPATIBLE WITH MARTINI V2.x
+;
+; Last modified: 15-may-2012 
+;
+;
+; please cite:
+;
+; C.A. Lopez, A. Rzepiela, A.H. de Vries, L. Dijkhuizen, P.H. Hunenberger, S.J. Marrink.
+; The MARTINI coarse-grained force field: Extension to carbohydrates.
+; JCTC, 5:3195-3210, 2009.
+;
+;
+; currently available:
+;
+;;;;; MONOSACCHARIDES:  glucose, fructose
+;;;;; DISACCHARIDES:    sucrose, trehalose, maltose, cellobiose, 
+;;;;;		        nigerose, laminarabiose, kojibiose, sophorose.
+;;;;; OLIGOSACCHARIDES: maltoheptaose (short amylose chain), 
+;;;;;                   laminaraheptabiose (short curdlan chain)
+
+
+;GLUCOSE
+
+[ moleculetype ]
+; molname nrexcl
+GLUC            1
+
+[ atoms ]
+;id type resnr residu atom cgnr charge mass
+1   P1   1     GLUC   B1   1    0.000  60.0528
+2   P4   1     GLUC   B2   2    0.000  60.0528
+3   P4   1     GLUC   B3   3    0.000  60.0528
+
+;[ bonds ]
+; i j   funct   length  forcec. 
+;  1 2 	1	0.375	35000
+;  1 3 	1	0.331	35000
+;  2 3 	1	0.322	50000
+
+[ constraints ]
+; i j   funct   length  forcec. 
+  1 2 	1	0.375	35000
+  1 3 	1	0.331	35000
+  2 3 	1	0.322	50000
+
+;FRUCTOSE
+
+[ moleculetype ]
+; molname nrexcl
+FRUC      1
+
+[ atoms ]
+;id type resnr residu atom cgnr charge mass
+1   P1   1     FRUC   B1   1    0.000  60.0528
+2   P3   1     FRUC   B2   2    0.000  60.0528
+3   P4   1     FRUC   B3   3    0.000  60.0528
+
+[ bonds ]
+; i j   funct   length  forcec. 
+  1 2   1	0.309	10000
+; 1 3   1	0.303	35000
+; 2 3   1	0.420	50000
+
+[ constraints ]
+; i j   funct   length  forcec. 
+  1 3   1	0.303	35000
+  2 3   1	0.420	50000
+
+;SUCROSE
+
+[ moleculetype ]
+; molname nrexcl
+SUCR      1
+
+[ atoms ]
+;id type resnr residu atom cgnr charge mass
+1   P1   1     SUCR   B1   1    0.000  59.0448
+2   P2   1     SUCR   B2   2    0.000  60.0528
+3   P4   1     SUCR   B3   3    0.000  60.0528
+4   P1   1     SUCR   B4   4    0.000  60.0528
+5   P1   1     SUCR   B5   5    0.000  60.0528
+6   P4   1     SUCR   B6   6    0.000  43.0454
+
+;[ bonds ]
+; i j   funct   length  forcec. 
+;  1 2   1	0.222	30000
+;  2 3   1	0.247	30000
+;  2 4   1	0.429	30000
+;  4 5   1	0.293	30000
+;  4 6   1	0.372	30000
+
+[ constraints ]
+; i j   funct   length  forcec. 
+  1 2   1	0.222	30000
+  2 3   1	0.247	30000
+  2 4   1	0.429	30000
+  4 5   1	0.293	30000
+  4 6   1	0.372	30000
+
+[ angles ]
+; i j k     funct   angle  forcec.
+  1 2 4     2	    130	   10
+  3 2 4     2	    110	   150
+  5 4 2     2	    20	   50
+  6 4 2     2	    85	   150
+
+[ dihedrals ]
+; i j k l   funct   angle  forcec.  multiplic.
+  1 2 4 5   1 	    130	   25 	    1
+  1 2 4 6   1 	    80	   2 	    1
+  3 2 4 5   1 	    -70	   20 	    1
+
+
+;MALTOSE
+
+[ moleculetype ]
+; molname nrexcl
+MALT      1
+
+[ atoms ]
+;id type resnr residu atom cgnr charge mass
+1   P1   1     MALT   B1   1    0.000  60.0528
+2   P2   1     MALT   B2   2    0.000  59.0448
+3   P4   1     MALT   B3   3    0.000  60.0528
+4   P2   1     MALT   B4   4    0.000  43.0454
+5   P1   1     MALT   B5   5    0.000  60.0528
+6   P4   1     MALT   B6   6    0.000  60.0528
+
+;[ bonds ]
+; i j   funct   length  forcec. 
+;  1 2   1 	0.222 	30000
+;  2 3   1 	0.246 	30000
+;  2 4   1 	0.561 	30000
+;  4 5   1 	0.239 	30000
+;  4 6   1 	0.281 	30000
+
+[ constraints ]
+; i j   funct   length  forcec. 
+  1 2   1 	0.222 	30000
+  2 3   1 	0.246 	30000
+  2 4   1 	0.561 	30000
+  4 5   1 	0.239 	30000
+  4 6   1 	0.281 	30000
+
+[ angles ]
+; i j k     funct   angle  forcec.
+  1 2 4     2	    150	   50
+  3 2 4     2	    140	   50
+  5 4 2     2	    70	   100
+  6 4 2     2	    50	   25
+
+[ dihedrals ]
+; i j k l   funct   angle  forcec.  multiplic.
+  1 2 4 5   1       110	   8        1
+  1 2 4 6   1       -20	   5        1
+  3 2 4 5   1       -80	   5        1
+
+
+;CELLOBIOSE
+
+[ moleculetype ]
+; molname nrexcl
+CELL       1
+
+[ atoms ]
+;id type resnr residu atom cgnr charge mass
+1   P1   1     CELL   B1   1    0.0000 44.0534
+2   P2   1     CELL   B2   2    0.0000 75.0442
+3   P4   1     CELL   B3   3    0.0000 60.0528
+4   P2   1     CELL   B4   4    0.0000 58.0368
+5   P1   1     CELL   B5   5    0.0000 44.0534
+6   P4   1     CELL   B6   6    0.0000 60.0528 
+
+;[ bonds ]
+; i j   funct   length  forcec. 
+;  1 2   1	0.242	30000
+;  2 3   1	0.284	30000
+;  2 4   1	0.518	30000
+;  4 5   1	0.234	30000
+;  4 6   1	0.278	30000
+
+[ constraints ]
+; i j   funct   length  forcec. 
+  1 2   1	0.242	30000
+  2 3   1	0.284	30000
+  2 4   1	0.518	30000
+  4 5   1	0.234	30000
+  4 6   1	0.278	30000
+
+[ angles ]
+; i j k     funct   angle  forcec.
+  1 2 4     2       126	   50
+  3 2 4     2	    120	   50
+  5 4 2     2	    60	   100
+  6 4 2     2	    65	   25
+
+[ dihedrals ]
+; i j k l   funct   angle  forcec.  multiplic.
+  1 2 4 5   1       30	   8        1
+  1 2 4 6   1       -150   5        1
+  3 2 4 5   1       -150   5        1
+
+
+;KOJIBIOSE
+
+[ moleculetype ]
+; molname nrexcl
+KOJI      1
+
+[ atoms ]
+;id type resnr residu atom cgnr charge mass
+1   P1   1     KOJI   B1   1    0.0000 44.0534
+2   P2   1     KOJI   B2   2    0.0000 75.0442
+3   P4   1     KOJI   B3   3    0.0000 60.0528
+4   P2   1     KOJI   B4   4    0.0000 59.1168
+5   P4   1     KOJI   B5   5    0.0000 60.0528
+6   P1   1     KOJI   B6   6    0.0000 44.0534 
+
+;[ bonds ]
+; i j   funct   length  forcec. 
+;  1 2   1	0.222	30000
+;  2 3   1	0.247	30000
+;  2 4   1	0.470	30000
+;  4 5   1	0.358	30000
+;  4 6   1	0.394	30000
+
+[ constraints ]
+; i j   funct   length  forcec. 
+  1 2   1	0.222	30000
+  2 3   1	0.247	30000
+  2 4   1	0.470	30000
+  4 5   1	0.358	30000
+  4 6   1	0.394	30000
+
+[ angles ]
+; i j k     funct   angle  forcec.
+  1 2 4     2	    127	   50
+  3 2 4     2	    81	   200
+  5 4 2     2	    75	   400
+  6 4 2     2	    120	   200
+
+[ dihedrals ]
+; i j k l   funct   angle  forcec.  multiplic.
+  1 2 4 5   1       165	   8        1
+  1 2 4 6   1       110	   10       1
+  3 2 4 5   1       5	   30       1
+
+
+;SOPHOROSE
+
+[ moleculetype ]
+; molname nrexcl
+SOPH      1
+
+[ atoms ]
+;id type resnr residu atom cgnr charge mass
+1   P1   1     SOPH   B1   1    0.0000 44.0534
+2   P2   1     SOPH   B2   2    0.0000 75.0442
+3   P4   1     SOPH   B3   3    0.0000 60.0528
+4   P2   1     SOPH   B4   4    0.0000 59.1168
+5   P4   1     SOPH   B5   5    0.0000 60.0528
+6   P1   1     SOPH   B6   6    0.0000 44.0534
+
+;[ bonds ]
+; i j   funct   length  forcec. 
+;  1 2   1	0.222	30000
+;  2 3   1	0.247	30000
+;  2 4   1	0.432	30000
+;  4 5   1	0.384	30000
+;  4 6   1	0.399	30000
+
+[ constraints ]
+; i j   funct   length  forcec. 
+  1 2   1	0.222	30000
+  2 3   1	0.247	30000
+  2 4   1	0.432	30000
+  4 5   1	0.384	30000
+  4 6   1	0.399	30000
+
+[ angles ]
+; i j k     funct   angle  forcec.
+  1 2 4     2	    90	   20
+  3 2 4     2	    125	   200
+  5 4 2     2	    90	   350
+  6 4 2     2	    125	   300
+
+[ dihedrals ]
+; i j k l   funct   angle  forcec.  multiplic.
+  1 2 4 5   1       40	   8        1
+  1 2 4 6   1       55	   10       1
+  3 2 4 5   1       -135   5        1
+
+
+;NIGEROSE
+
+[ moleculetype ]
+; molname nrexcl
+NIGE      1
+
+[ atoms ]
+;id type resnr residu atom cgnr charge mass 
+1   P1   1     NIGE   B1   1    0.0000 44.0534
+2   P2   1     NIGE   B2   2    0.0000 75.0442
+3   P4   1     NIGE   B3   3    0.0000 60.0528  
+4   P2   1     NIGE   B4   4    0.0000 60.0528
+5   P4   1     NIGE   B5   5    0.0000 60.0528
+6   P1   1     NIGE   B6   6    0.0000 43.0454
+
+;[ bonds ]
+; i j   funct   length  forcec. 
+;  1 2   1	0.222	30000
+;  2 3   1	0.247	30000
+;  2 4   1	0.413	30000
+;  4 5   1	0.294	30000
+;  4 6   1	0.424	30000
+
+[ constraints ]
+; i j   funct   length  forcec. 
+  1 2   1	0.222	30000
+  2 3   1	0.247	30000
+  2 4   1	0.413	30000
+  4 5   1	0.294	30000
+  4 6   1	0.424	30000
+
+[ angles ]
+; i j k     funct   angle  forcec.
+  1 2 4     2	    87	   5
+  3 2 4     2	    130	   125
+  5 4 2     2	    50	   250
+  6 4 2     2	    96	   250
+
+[ dihedrals ]
+; i j k l   funct   angle  forcec.  multiplic.
+  1 2 4 5   1       -15	   15       1
+  1 2 4 6   1       -22	   15       1
+  3 2 4 5   1       160	   1        1
+
+
+;LAMINARABIOSE
+
+[ moleculetype ]
+; molname nrexcl
+LAMI      1
+
+[ atoms ]
+;id type resnr residu atom cgnr charge mass
+1   P1   1     LAMI   B1   1    0.0000 60.0528
+2   P2   1     LAMI   B2   2    0.0000 59.0448
+3   P4   1     LAMI   B3   3    0.0000 60.0528
+4   P2   1     LAMI   B4   4    0.0000 43.0454
+5   P4   1     LAMI   B5   5    0.0000 60.0528
+6   P1   1     LAMI   B6   6    0.0000 60.0528
+
+;[ bonds ]
+; i j   funct   length  forcec. 
+;  1 2   1	0.329	30000
+;  2 3   1	0.376	30000
+;  2 4   1	0.356	30000
+;  4 5   1	0.276	30000
+;  4 6   1	0.372	30000
+
+[ constraints ]
+; i j   funct   length  forcec. 
+  1 2   1	0.329	30000
+  2 3   1	0.376	30000
+  2 4   1	0.356	30000
+  4 5   1	0.276	30000
+  4 6   1	0.372	30000
+
+[ angles ]
+; i j k     funct   angle  forcec.
+  1 2 4     2	    54	   80
+  3 2 4     2	    124	   200
+  5 4 2     2	    44	   500
+  6 4 2     2	    67	   800
+
+[ dihedrals ]
+; i j k l   funct   angle  forcec.  multiplic.
+  1 2 4 5   1       20	   15       1
+  1 2 4 6   1       55	   5        1
+  3 2 4 5   1       42	   5        1
+
+
+;TREHALOSE
+
+[ moleculetype ]
+; molname nrexcl
+TREH      1
+
+[ atoms ]
+;id type resnr residu atom cgnr charge mass
+1   P1   1     TREH   B1   1    0.0000 44.0534
+2   P2   1     TREH   B2   2    0.0000 75.0442
+3   P4   1     TREH   B3   3    0.0000 60.0528
+4   P2   1     TREH   B4   4    0.0000 58.0368
+5   P1   1     TREH   B5   5    0.0000 44.0534
+6   P4   1     TREH   B6   6    0.0000 60.0528
+
+; [ bonds ]
+; i j   funct   length  forcec. 
+;   1 2   1	0.222	30000
+;   2 3   1	0.246	30000
+;   2 4   1	0.512	30000
+;   4 5   1	0.231	30000
+;   4 6   1	0.220	30000
+
+[ constraints ]
+; i j   funct   length  forcec. 
+  1 2   1	0.222	30000
+  2 3   1	0.246	30000
+  2 4   1	0.512	30000
+  4 5   1	0.231	30000
+  4 6   1	0.220	30000
+
+[ angles ]
+; i j k     funct   angle  forcec.
+  1 2 4     2	    150	   100
+  3 2 4     2	    95 	   250
+  5 4 2     2	    120	   80
+  6 4 2     2	    65	   180
+
+[ dihedrals ]
+; i j k l   funct   angle  forcec.  multiplic.
+  1 2 4 5   1       -80	   8        1
+  1 2 4 6   1       123	   5        1
+  3 2 4 5   1       -40	   20       1
+
+; MALTOHEPTAOSE (oligosaccharide of seven glucose monomers 
+;                linked by alpha 1-4 glycosidic bonds,
+;                building block of AMYLOSE)
+;
+[ moleculetype ]
+; molname            nrexcl
+Maltoheptaose             1
+
+[ atoms ]
+;   nr       type  resnr residue  atom   cgnr     charge       mass  
+     1         P2      1   AMYL     B2      1          0    75.0442   
+     2         P4      1   AMYL     B3      1          0    60.0528   
+     3         P1      1   AMYL     B1      1          0    44.0534   
+     4         P2      2   AMYL     B4      2          0    58.0368   
+     5         P4      2   AMYL     B6      2          0    60.0528   
+     6         P1      2   AMYL     B5      2          0    44.0534   
+     7         P2      3   AMYL     B2      3          0    58.0368   
+     8         P4      3   AMYL     B3      3          0    60.0528   
+     9         P1      3   AMYL     B1      3          0    44.0534   
+    10         P2      4   AMYL     B4      4          0    58.0368   
+    11         P4      4   AMYL     B6      4          0    60.0528   
+    12         P1      4   AMYL     B5      4          0    44.0534   
+    13         P2      5   AMYL     B2      5          0    58.0368   
+    14         P4      5   AMYL     B3      5          0    60.0528   
+    15         P1      5   AMYL     B1      5          0    44.0534   
+    16         P2      6   AMYL     B4      6          0    58.0368   
+    17         P4      6   AMYL     B6      6          0    60.0528   
+    18         P1      6   AMYL     B5      6          0    44.0534   
+    19         P2      7   AMYL     B2      7          0    59.0448   
+    20         P4      7   AMYL     B3      7          0    60.0528   
+    21         P1      7   AMYL     B1      7          0    44.0534   
+
+[ constraints ]
+;  ai    aj     funct length fc  
+    1     2         1 0.222 30000
+    1     3         1 0.246 30000
+    1     4         1 0.561 30000
+    4     5         1 0.239 30000
+    4     6         1 0.281 30000
+    4     7         1 0.561 30000
+    7     8         1 0.222 30000
+    7     9         1 0.246 30000
+    7    10         1 0.561 30000
+   10    11         1 0.239 30000
+   10    12         1 0.281 30000
+   10    13         1 0.561 30000
+   13    14         1 0.222 30000
+   13    15         1 0.246 30000
+   13    16         1 0.561 30000
+   16    17         1 0.239 30000
+   16    18         1 0.281 30000
+   16    19         1 0.561 30000
+   19    20         1 0.222 30000
+   19    21         1 0.246 30000
+ 
+[ angles ]
+;  ai    aj    ak     funct angle  fc 
+    2     1     4         2 150.00 50.00
+    3     1     4         2 140.00 50.00
+    1     4     5         2 70.00  100.00
+    1     4     6         2 50.00  25.00
+    5     4     7         2 150.00 50.00
+    6     4     7         2 140.00 50.00
+    4     7     8         2 70.00  100.00
+    4     7     9         2 50.00  25.00
+    8     7    10         2 150.00 50.00
+    9     7    10         2 140.00 50.00
+    7    10    11         2 70.00  100.00
+    7    10    12         2 50.00  25.00
+   11    10    13         2 150.00 50.00
+   12    10    13         2 140.00 50.00
+   10    13    14         2 70.00  100.00
+   10    13    15         2 50.00  25.00
+   14    13    16         2 150.00 50.00
+   15    13    16         2 140.00 50.00
+   13    16    17         2 70.00  100.00
+   13    16    18         2 50.00  25.00
+   17    16    19         2 150.00 50.00
+   18    16    19         2 140.00 50.00
+   16    19    20         2 70.00  100.00
+   16    19    21         2 50.00  25.00
+;
+;  the following angles betnwee three consecutive sugar monomers
+;  depend on the environment
+;
+;  for polar solvents use:
+;
+1	4	7	2	154	100
+4	7	10	2	154	100
+7	10	13	2	154	100
+10	13	16	2	154	100
+13	16	19	2	154	100
+;
+; for non-polar solvents use:
+;
+;1	4	7	2	120	250
+;4	7	10	2	120	250
+;7	10	13	2	120	250
+;10	13	16	2	120	250
+;13	16	19	2	120	250
+
+[ dihedrals ]
+;  ai    aj    ak    al funct     angle  fc   mult 
+    2     1     4     5     1     110.00 8.00 1
+    2     1     4     6     1     -20.00 5.00 1
+    3     1     4     5     1     -80.00 5.00 1
+    5     4     7     8     1     110.00 8.00 1
+    5     4     7     9     1     -20.00 5.00 1
+    6     4     7     8     1     -80.00 5.00 1
+    8     7    10    11     1     110.00 8.00 1
+    8     7    10    12     1     -20.00 5.00 1
+    9     7    10    11     1     -80.00 5.00 1
+   11    10    13    14     1     110.00 8.00 1
+   11    10    13    15     1     -20.00 5.00 1
+   12    10    13    14     1     -80.00 5.00 1
+   14    13    16    17     1     110.00 8.00 1
+   14    13    16    18     1     -20.00 5.00 1
+   15    13    16    17     1     -80.00 5.00 1
+   17    16    19    20     1     110.00 8.00 1
+   17    16    19    21     1     -20.00 5.00 1
+
+
+; LAMINARAHEPTABIOSE (oligosaccharide of seven glucose monomers 
+;                     linked by beta 1-3 glycosidic bonds,
+;                     building block of CURDLAN)
+
+[ moleculetype ]
+; Name            nrexcl
+Laminaraheptabiose             1
+
+[ atoms ]
+;   nr       type  resnr residue  atom   cgnr     charge       mass  
+     1         P2      1   CURD     B2      1          0    59.0448   
+     2         P4      1   CURD     B1      1          0    60.0528   
+     3         P1      1   CURD     B3      1          0    60.0528   
+     4         P2      2   CURD     B4      2          0    43.0454   
+     5         P4      2   CURD     B5      2          0    60.0528   
+     6         P1      2   CURD     B6      2          0    60.0528   
+     7         P2      3   CURD     B2      3          0    43.0454   
+     8         P4      3   CURD     B1      3          0    60.0528   
+     9         P1      3   CURD     B3      3          0    60.0528   
+    10         P2      4   CURD     B4      4          0    43.0454   
+    11         P4      4   CURD     B5      4          0    60.0528   
+    12         P1      4   CURD     B6      4          0    60.0528   
+    13         P2      5   CURD     B2      5          0    43.0454   
+    14         P4      5   CURD     B1      5          0    60.0528   
+    15         P1      5   CURD     B3      5          0    60.0528   
+    16         P2      6   CURD     B4      6          0    43.0454   
+    17         P4      6   CURD     B5      6          0    60.0528   
+    18         P1      6   CURD     B6      6          0    60.0528   
+    19         P2      7   CURD     B2      7          0    43.0454   
+    20         P4      7   CURD     B1      7          0    60.0528   
+    21         P1      7   CURD     B3      7          0    60.0528   
+
+[ constraints ]
+;  ai    aj     funct length fc 
+    1     2         1 0.329 30000
+    1     3         1 0.376 30000
+    1     4         1 0.356 30000
+    4     5         1 0.276 30000
+    4     6         1 0.220 30000
+    4     7         1 0.356 30000
+    7     8         1 0.329 30000
+    7     9         1 0.376 30000
+    7    10         1 0.356 30000
+   10    11         1 0.276 30000
+   10    12         1 0.220 30000
+   10    13         1 0.356 30000
+   13    14         1 0.329 30000
+   13    15         1 0.376 30000
+   13    16         1 0.356 30000
+   16    17         1 0.276 30000
+   16    18         1 0.220 30000
+   16    19         1 0.356 30000
+   19    20         1 0.329 30000
+   19    21         1 0.376 30000
+
+[ angles ]
+;  ai    aj    ak funct    angle 	fc 
+    2     1     4     2    54.00 	80
+    3     1     4     2    124.00 	200
+    1     4     5     2    44.00 	500
+    1     4     6     2    67.00 	800
+    5     4     7     2    54.00 	80
+    6     4     7     2    124.00 	200
+    4     7     8     2    44.00 	500
+    4     7     9     2    67.00 	800
+    8     7    10     2    54.00 	80
+    9     7    10     2    124.00 	200
+    7    10    11     2    44.00 	500
+    7    10    12     2    67.00 	800
+   11    10    13     2    54.00 	80
+   12    10    13     2    124.00 	200
+   10    13    14     2    44.00 	500
+   10    13    15     2    67.00 	800
+   14    13    16     2    54.00 	80
+   15    13    16     2    124.00 	200
+   13    16    17     2    44.00 	500
+   13    16    18     2    67.00 	800
+   17    16    19     2    54.00 	80
+   18    16    19     2    124.00 	200
+   16    19    20     2    44.00 	500
+   16    19    21     2    67.00 	800
+;
+; angles between three consecutive monomers 
+;
+    1  	4  	7 	1 136.00 	500
+    4  	7  	10 	1 136.00 	500
+    7  	10 	13 	1 136.00 	500
+    10 	13 	16 	1 136.00 	500
+    13 	16 	19 	1 136.00 	500
+
+[ dihedrals ]
+;  ai    aj    ak    al funct    angle fc    mult 
+    5     4     7     8     1    20.00 15    1
+    5     4     7     9     1    55.00 5     1
+    6     4     7     8     1    42.00 5     1
+   11    10    13    14     1    20.00 15    1
+   11    10    13    15     1    55.00 5     1
+   12    10    13    14     1    42.00 5     1
+   17    16    19    20     1    20.00 15    1
+   17    16    19    21     1    55.00 5     1
+   18    16    19    20     1    42.00 5     1

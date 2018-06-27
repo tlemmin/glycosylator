@@ -141,9 +141,9 @@ class GlycosylatorGUI(tk.Tk):
         self.v_scrollbar.config(command = self.glycoprotein_2D.yview)
         self.h_scrollbar.config(command = self.glycoprotein_2D.xview)
         
-        self.glycoprotein_2D.bind_all("<MouseWheel>", self._on_mousewheel)
-        self.glycoprotein_2D.bind_all("<Button-4>", self._on_mousewheel)
-        self.glycoprotein_2D.bind_all("<Button-5>", self._on_mousewheel)
+        self.glycoprotein_2D.bind("<MouseWheel>", self._on_mousewheel)
+        self.glycoprotein_2D.bind("<Button-4>", self._on_mousewheel)
+        self.glycoprotein_2D.bind("<Button-5>", self._on_mousewheel)
 
         self.detach_button = tk.Button(self.left_frame, command = self.detach_plot)
         self.detach_icon = tk.PhotoImage(file="icons/detach.gif")
@@ -218,7 +218,7 @@ class GlycosylatorGUI(tk.Tk):
 
         l = len(self.myGlycosylator.sequences[chid])
         sequons = [k for k in self.myGlycosylator.sequons.keys() if chid in k[:len(chid)]]
-        trees = self.myGlycosylator.glycans
+        trees = self.original_glycans.copy()
         trees.update(self.linked_glycans)
         self.myDrawer.draw_glycoprotein(l, self.myGlycosylator.get_start_resnum(chid), sequons, ax = ax, axis = 0,
                 trees = trees, names = self.names, sequon_color = self.sequon_colors)
@@ -279,8 +279,8 @@ class GlycosylatorGUI(tk.Tk):
             name = 'Structure: ' + self.myDrawer.tree_to_text(tree, root, self.names, visited = [])
         ax.axis('equal')
         ax.axis('off')
-        ax.set_ylim((-3, 6))
-        ax.set_xlim((-3, 3))
+        #ax.set_ylim((-3, 6))
+        #ax.set_xlim((-3, 3))
         # Add to tk window
         figure_canvas_agg = FigureCanvasAgg(fig)
         figure_canvas_agg.draw()
@@ -306,12 +306,12 @@ class GlycosylatorGUI(tk.Tk):
 
         l = len(self.myGlycosylator.sequences[chid])
         
-        trees = self.myGlycosylator.glycans
+        trees = self.original_glycans.copy()
         trees.update(self.linked_glycans)
          
         sequons = [k for k in self.myGlycosylator.sequons.keys() if chid in k[:len(chid)]]
         self.myDrawer.draw_glycoprotein(l, self.myGlycosylator.get_start_resnum(chid), sequons, ax = ax, axis = 1,
-                trees = trees, names = self.names)
+                trees = trees, names = self.names, sequon_color = self.sequon_colors)
         ax.axis('equal')
         ax.axis('off')
         figure_canvas_agg = FigureCanvasAgg(fig)
@@ -338,7 +338,7 @@ class GlycosylatorGUI(tk.Tk):
         self.linked_glycanMolecules = {}
         #Load new glycoprotein and extract glycans
         self.myGlycosylator.load_glycoprotein(filename)
-        self.original_glycansMolecules = self.myGlycosylator.glycanMolecules.copy()
+        self.original_glycanMolecules = self.myGlycosylator.glycanMolecules.copy()
         self.original_glycans = self.myGlycosylator.glycans.copy()
         self.names = self.myGlycosylator.names
         
@@ -893,23 +893,27 @@ class GlycosylatorGUI(tk.Tk):
         #Build new glycan
         if self.selected_glycan:
             self.myGlycosylator.connect_topology['SELECTED'] = self.selected_glycan[1]
-            original_glycan = None
-            connect_tree = None 
+            #build from current glycan
+            if key in self.original_glycans:
+                original_glycan = self.original_glycanMolecules[key].atom_group
+                r,t = self.original_glycans[key]
+                connect_tree = self.myGlycosylator.build_connectivity_tree(r, t)
+            else:
+                original_glycan = None
+                connect_tree = None 
         #Use current glycan
         else:
-            print self.original_glycan
-            print key
-            original_glycan = self.original_glycan[key]
-            connect_tree = self.myGlycosylator(original_glycan) 
-            self.myGlycosylator.connect_topology['SELECTED'] = self.connect_tree_to_topology(connect_tree) 
-
-        #if key in self.original_glycans:
-        #    connect_tree = 
-        #    original_glycan = self.original_glycans[key]
+            original_glycan = self.original_glycanMolecules[key]
+            r,t = self.original_glycans[key]
+            connect_tree = self.myGlycosylator.build_connectivity_tree(r, t)
+            self.myGlycosylator.connect_topology['SELECTED'] = self.connect_tree_to_topology(self.myGlycosylator.build_connect_topology(original_glycan)) 
+            original_glycan = original_glycan.atom_group
+        
+        segname = 'G'+key.split(',')[2]
         glycan,bonds = self.myGlycosylator.glycosylate('SELECTED', 
                                                         template_glycan_tree = connect_tree, 
                                                         template_glycan = original_glycan,
-                                                        link_residue=residue, link_patch = 'NGLB')
+                                                        link_residue=residue, link_patch = 'NGLB', segname=segname)
         new_glycan = glc.Molecule(key)
         new_glycan.set_AtomGroup(glycan, bonds = bonds)
         self.myGlycosylator.assign_patches(new_glycan)

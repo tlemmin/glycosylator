@@ -299,7 +299,7 @@ class CHARMMParameters:
                         BONDS: atom1-atom2                  ->  k0, d0
                         ANGLES: atom1-atom2-atom3           ->  k0, a0, kub, d0
                         DIHEDRALS: atom1-atom2-atom3-atom4  ->  k0, n, dela
-                        NONBONDED: atom1                    ->  
+                        NONBONDED: atom1                    ->  e, r/2, X, e(1-4) , r/2(1-4)
                         IMPROPER: atom1-atom2-atom3-atom4   ->  
                         NBFIX: atom1-atom2                  ->
                         CMAP:
@@ -365,7 +365,7 @@ class CHARMMParameters:
     def read_NONBONDED(self, vdw, prm):
         #CT3            0.0             -0.0780        2.040 ! 0.0 -0.01 1.9 ! alkane, 4/98, yin, adm jr.
         if len(vdw)==4 or len(vdw)==7:
-            prm[vdw[0]]=map(float, vdw[1:])
+            prm[vdw[0]]=map(float, vdw[2:])
         else:
             print "Invalid NONBONDED: "+' '.join(vdw)
             
@@ -600,8 +600,8 @@ class Molecule:
         """
         if update_bonds:
             self.guess_bonds()
-        #self.guess_angles()
-        #self.guess_dihedrals()
+        self.guess_angles()
+        self.guess_dihedrals()
         self.update_graphs()
         self.bonded_uptodate = True 
 
@@ -1635,19 +1635,25 @@ class Glycosylator:
         for k,v in self.glycans.items():
             r,g = v
             sel = []
+
+            # !!!hard coded!!! Should be patch dependent
+            selg = []
+            for p,s in zip(self.prefix, r.split(',')):
+                if s:
+                    selg.append(p + ' ' + s)
+            rootAtom = self.glycoprotein.select(' and '.join(selg) + ' and name C1').getSerials()[0]
+
             for node in g.nodes():
                 selg = []
                 for p,s in zip(self.prefix, node.split(',')):
                     if s:
                         selg.append(p + ' ' + s)
-                if not sel:
-                    # !!!hard coded!!! Should be patch dependent
-                    rootAtom = self.glycoprotein.select(' and '.join(selg) + ' and name C1').getSerials()[0]
                 sel.append(' and '.join(selg))
             sel = '(' + ') or ('.join(sel) +')'
             sel_all.append(sel)
             glycan = Molecule(k)
             glycan.set_AtomGroup(self.glycoprotein.select(sel).copy(), rootAtom = rootAtom)
+            self.assign_patches(glycan) 
             self.glycanMolecules[k] = glycan
         self.protein = self.glycoprotein.select('not ((' + ') or ('.join(sel_all) + '))').copy()
      
@@ -1709,11 +1715,13 @@ class Glycosylator:
         return ','.join([segn, chid, str(res), ic]), rn
 
 
-    def glycosylate(self, glycan_name, link_residue = None, link_patch = None, template_glycan_tree = {}, template_glycan = None, chain = 'X', segname = 'G1'):
+    def glycosylate(self, glycan_name, glycan_molecule = None, link_residue = None, link_patch = None, template_glycan_tree = {}, template_glycan = None, chain = 'X', segname = 'G1'):
         """Builds a polyglycan from a connectivity tree
         Parameters:
             glycan_name: name of poly glycan
+            glycan_molecule: Molecule instance
             kwargs:
+                
                 segname: segname for new glyan (str)
                 chain: chain for new
                 link_residue: residue to link new glycan (AtomGroup)
@@ -1732,6 +1740,21 @@ class Glycosylator:
         resid = 1
         dummy_patch = 'DUMMY_MAN'
         prefix = ['segment', 'chain', 'resid', 'icode']
+
+        if glycan_name in self.connect_topology:
+            glycan_topo = self.get_connectivity_tree(glycan_name)
+        elif glycan_molecule:
+            self.assign_patches(glycan_molecule)
+            glycan_topo = self.build_glycan_topo(glycan_molecule)
+            template_glycan_tree = self.build_connectivity_tree(glycan_molecule.rootRes, glycan_molecule.interresidue_connectivity)
+            template_glycan = glycan_molecule.atom_group
+            print glycan_topo
+            print self.get_connectivity_tree('MAN9_3;4,2')
+            print template_glycan_tree
+        else:
+            print "Unkown Glycan"
+            return [], []
+        #Variable for storing the new glycan
         glycan = None
         glycan_bonds = []
         built_glycan = {}
@@ -1743,74 +1766,70 @@ class Glycosylator:
             chain = template_glycan.getChids()[0]
             segname = template_glycan.getSegnames()[0]
         
-        if glycan_name in self.connect_topology:
-            glycan_topo = self.get_connectivity_tree(glycan_name)
-            sorted_units =  sorted(glycan_topo.keys(), key = len)
-            for unit in sorted_units:
-                new_residue = None
-                if unit:
-                    lunit = unit.split(' ')
-                    previous = ' '.join(lunit[:-1])
-                else:
-                    lunit = []
-                    previous = ''
+        
+        sorted_units =  sorted(glycan_topo.keys(), key = len)
+        for unit in sorted_units:
+            new_residue = None
+            if unit:
+                lunit = unit.split(' ')
+                previous = ' '.join(lunit[:-1])
+            else:
+                lunit = []
+                previous = ''
 
-                del_atom = []
+            del_atom = []
 
-                #check if residue exists
-                if unit in inv_template_glycan_tree:
-                    sel  = []
-                    
-                    for p,s in zip(prefix, inv_template_glycan_tree[unit].split(',')):
-                        if s:
-                            sel.append(p + ' ' + s)
-                    sel = ' and '.join(sel)
-                    sel_residue = template_glycan.select(sel)
-                    if sel_residue.getResnames()[0] == glycan_topo[unit]:
-                        built_glycan[unit] = ','.join([segname, chain, str(resid),])
-                        #built_glycan[unit] = inv_template_glycan_tree[unit]
-                        new_residue,missing_atoms,bonds = self.builder.add_missing_atoms(sel_residue, resid)
-                        #new_residue.setResnums([resid]*len(new_residue))
-                        ics = self.builder.Topology.topology[glycan_topo[unit]]['IC']
-                        self.builder.build_missing_atom_coord(new_residue, missing_atoms, ics)
-                    else:
-                        print 'Error in connect tree!! Residue will be build de novo'
-
-                #build first unit from DUMMY or from linked residue
-                if not lunit and not new_residue:
-                    if link_residue and link_patch:
-                        new_residue, del_atom, bonds = self.builder.build_from_patch(link_residue, resid, glycan_topo[unit], chain, segname, link_patch)
-                    else:
-                        new_residue, del_atom, bonds = self.builder.build_from_DUMMY(resid, glycan_topo[unit], chain, segname, dummy_patch)
-                elif previous in built_glycan and lunit:
-                    patch = lunit[-1]
-                    sel = []
-                    for p,s in zip(prefix, built_glycan[previous].split(',')):
-                        if s:
-                            sel.append(p + ' ' + s)
-                    sel = ' and '.join(sel)
-                    previous_residue = glycan.select(sel)
-                    if new_residue:
-                        del_atom, b = self.builder.apply_patch(patch,previous_residue, new_residue)
-                        bonds.extend(b)
-                    else:
-                        new_residue, del_atom, bonds = self.builder.build_from_patch(previous_residue, resid, glycan_topo[unit], chain, segname, patch)                           
-                elif lunit:
-                    print 'Error in connect tree!! Glycans will not be builts'
-                    return [], []
-
-                built_glycan[unit] = ','.join([segname, chain, str(resid),])
-                dele_atoms += del_atom
-                glycan_bonds.extend(bonds)
+            #check if residue exists
+            if unit in inv_template_glycan_tree:
+                sel  = []
                 
-                if glycan:
-                    glycan += new_residue
+                for p,s in zip(prefix, inv_template_glycan_tree[unit].split(',')):
+                    if s:
+                        sel.append(p + ' ' + s)
+                sel = ' and '.join(sel)
+                sel_residue = template_glycan.select(sel)
+                if sel_residue.getResnames()[0] == glycan_topo[unit]:
+                    built_glycan[unit] = ','.join([segname, chain, str(resid),])
+                    #built_glycan[unit] = inv_template_glycan_tree[unit]
+                    new_residue,missing_atoms,bonds = self.builder.add_missing_atoms(sel_residue, resid)
+                    #new_residue.setResnums([resid]*len(new_residue))
+                    ics = self.builder.Topology.topology[glycan_topo[unit]]['IC']
+                    self.builder.build_missing_atom_coord(new_residue, missing_atoms, ics)
                 else:
-                    glycan = new_residue
-                resid += 1
-        else:
-            print "Unkown Glycan"
-            return [], []
+                    print 'Error in connect tree!! Residue will be build de novo'
+            print unit,lunit,new_residue
+            #build first unit from DUMMY or from linked residue
+            if not lunit and not new_residue:
+                if link_residue and link_patch:
+                    new_residue, del_atom, bonds = self.builder.build_from_patch(link_residue, resid, glycan_topo[unit], chain, segname, link_patch)
+                else:
+                    new_residue, del_atom, bonds = self.builder.build_from_DUMMY(resid, glycan_topo[unit], chain, segname, dummy_patch)
+            elif previous in built_glycan and lunit:
+                patch = lunit[-1]
+                sel = []
+                for p,s in zip(prefix, built_glycan[previous].split(',')):
+                    if s:
+                        sel.append(p + ' ' + s)
+                sel = ' and '.join(sel)
+                previous_residue = glycan.select(sel)
+                if new_residue:
+                    del_atom, b = self.builder.apply_patch(patch,previous_residue, new_residue)
+                    bonds.extend(b)
+                else:
+                    new_residue, del_atom, bonds = self.builder.build_from_patch(previous_residue, resid, glycan_topo[unit], chain, segname, patch)                           
+            elif lunit:
+                print 'Error in connect tree!! Glycans will not be builts'
+                return [], []
+
+            built_glycan[unit] = ','.join([segname, chain, str(resid),])
+            dele_atoms += del_atom
+            glycan_bonds.extend(bonds)
+            
+            if glycan:
+                glycan += new_residue
+            else:
+                glycan = new_residue
+            resid += 1
             
         if dele_atoms:
             glycan = self.builder.delete_atoms(glycan, dele_atoms)
@@ -1830,6 +1849,36 @@ class Glycosylator:
             glycan.select('index ' + str(i)).setSerials([i+1])
 
         return glycan, glycan_bonds
+    
+    def connect_tree_to_topology(self, connect_tree):
+        """Converts a connect tree to a connect topology
+           In connect tree the connectivity is represented as a string whereas it is a list in connect topology
+        """
+        connect_topology = {}
+        units = connect_tree['UNIT']
+        unit_list = []
+        n_unit = 0
+        for unit in units:
+            unit = filter(None, unit.split(' '))
+            n_unit +=1
+            if len(unit) > 1:
+                unit_list.append([unit[0], 'C1', unit[1:]])
+            else:
+                unit_list.append([unit[0], '', []])
+        connect_topology['UNIT'] = unit_list
+        connect_topology['#UNIT'] = n_unit
+        return connect_topology
+    
+    def generate_glycan_topology(self, patch = 'NGLB'):
+        """ Generates the topology of all identified glycans
+        Parameters:
+            patch: patch used to link glycan to protien
+        """
+        pass
+        
+
+
+
 
     def get_connectivity_tree (self, glycan_name):
         """Builds connectivity tree of a glycan described in the connectivity topology
@@ -1900,13 +1949,30 @@ class Glycosylator:
         
         target=[]
         for r in connect_tree.keys():
-            target.append(G.node[r]['resname'] + ' ' + connect_tree[r])
+            if connect_tree[r]:
+                target.append([G.node[r]['resname'], ' ', connect_tree[r].split(' ')])
+            else:
+                target.append([G.node[r]['resname'], ' ', []])
+
         len_target=len(target)
         residue = {}
         residue['UNIT'] =  target
         residue['#UNIT'] = len_target
         return residue
+    
+    def build_glycan_topo(self, molecule):
+        """Builds connectivity topology
+        Parameters:
+            molecule: Molecule object
+        """
+        G = molecule.interresidue_connectivity
+        connect_tree = self.build_connectivity_tree(molecule.rootRes, G) 
+        
+        glycan_topo = {}
+        for r in connect_tree.keys():
+                glycan_topo[connect_tree[r]] = G.node[r]['resname']
 
+        return glycan_topo 
 
     def identify_glycan(self, molecule):
         """Identifies glycan name
@@ -2050,25 +2116,72 @@ class Glycosylator:
 class Sampler():
     """Class to sample conformations, based on a 
     """
-    def __init__(self, molecules, envrionment, dihe_parameters, clash_dist = 1.5):
+    def __init__(self, molecules, envrionment, dihe_parameters, vdw_parameters, clash_dist = 1.5):
         """ 
         Parameters
             molecules: list of Molecules instances
             environment: AtomGroup that will not be samples (e.g. protein, membrane, etc.)
-            dihe_parameters: dictionary of parameters for dihedrals from CHARMMParameters
+            dihe_parameters: dictionary of parameters for dihedrals from CHARMMParameters. Atomtype as key and [k, n, d] as values
+            vdw_parameters: dictionary of parameters for van der Waals from CHARMMParameters. Atomtype as key and [r, e] as values
             clash_dist = threshold for defining a clash (A)
         """
         self.molecules = molecules
         self.environment = envrionment
-        self.clash_dist = clash_dist 
+        self.clash_dist = clash_dist
+        self.cutoff_dist =  10.
         self.energy = {}
         self.energy_lookup = []
         self.nbr_clashes = []
+        self.non_bonded_energy = []
+        self.CG_energy = []
+        self.charges = [] 
+        self.vdw = [] 
+        self.vdw_CG = []
+        self.vdw_CG_par = {}
+        #Parameters from MARTINI force field
+        self.vdw_CG_par['P1P1'] = []
+        self.vdw_CG_par['P1P3'] = []
+        self.vdw_CG_par['P1P4'] = []
+        self.vdw_CG_par['P1P5'] = []
+        self.vdw_CG_par['P3P3'] = [0.21558, 0.0023238]
+        self.vdw_CG_par['P3P4'] = [0.21558, 0.0023238]
+        self.vdw_CG_par['P3P5'] = [0.24145, 0.0026027]
+        self.vdw_CG_par['P4P4'] = [0.094820, 0.00059939] 
+        self.vdw_CG_par['P4P5'] = [0.24145, 0.0026027] 
+        self.vdw_CG_par['P5P5'] = [0.24145, 0.0026027] 
+        
+        self.sel_CG=['name C1 C3 C5 C7']
+
         mol_id =  0
         for molecule in self.molecules:
             types = nx.get_node_attributes(molecule.connectivity, 'type')
+            keys = types.keys()
+            keys.sort()
+            charges = nx.get_node_attributes(molecule.connectivity, 'charge')
+            names = nx.get_node_attributes(molecule.connectivity, 'name')
+            charge = []
+            vdw = []
+            for k in keys:
+                charge.append(charges[k])
+                vdw.append(vdw_parameters[types[k]][:2])
+                if names[k] == 'C1':
+                    self.vdw_CG = 'P4'
+                elif names[k] == 'C3':
+                    self.vdw_CG = 'P4'
+                elif names[k] == 'C5':
+                    self.vdw_CG = 'P1'
+                elif names[k] == 'C7':
+                    self.vdw_CG = 'P3'
+
+            self.charges.append(charge)
+            self.vdw.append(vdw)
+
+
             lookup = []
             self.nbr_clashes.append(self.count_total_clashes(mol_id))
+            self.non_bonded_energy.append(self.compute_total_energy(mol_id))
+            #self.CG_energy.append(self.compute_self_CG_energy(mol_id))
+
             for dihe in molecule.torsionals:
                 atypes = []
                 for d in dihe:
@@ -2119,7 +2232,7 @@ class Sampler():
         cum_values[1:] = np.cumsum(energy[1:]*np.diff(phi))
         inv_cdf = interp1d(cum_values, phi)
         return inv_cdf
-        
+
     
     def count_total_clashes(self, mol_id):
         """Counts the total number of clashes in the system. 
@@ -2137,7 +2250,7 @@ class Sampler():
         """Counts the number of clashes for a molecule
         KDTree based
         Parameters:
-            molecule: Molecule type object
+            mol_id: id of molecule to consider 
         Returns
             nbr_clashes: the number of clashes
             clashes: list of clashing atom serial numbers
@@ -2154,7 +2267,7 @@ class Sampler():
                 nbr_clashes += 1
                 clashes += (a1+1,a2+1)
         return nbr_clashes,clashes
-        
+    
     def count_environment_clashes(self, mol_id):
         """Counts the number of a molecule and its environment
         Parameters:
@@ -2175,6 +2288,114 @@ class Sampler():
             nbr_clashes += np.sum(Y < self.clash_dist)
         return nbr_clashes 
     
+    def compute_total_energy(self, mol_id):
+        """Counts the total number of clashes in the system. 
+        Performed in two steps:
+                - count the number of clashes within a molecules (KDTree)
+                - count the number of clashes between the molecule and it's environment (Grid)
+        Parameters:
+            mol_id: id of the molecule
+        """
+        energy = self.compute_self_non_bonded_energy(mol_id)
+        energy += self.compute_environment_energy(mol_id)
+        return energy
+
+    def compute_self_non_bonded_energy(self, mol_id):
+        """ Computes the van der Waals and electrostatic interaction of glycan
+        The non bonded energy will be computed for all atoms, except those connected by a bond
+        Parameters:
+            mol_id: id of molecule
+        Returns:
+            energy: non bonded energy
+        """
+        molecule = self.molecules[mol_id]
+        kd = KDTree(molecule.atom_group.getCoords())
+        kd.search(self.cutoff_dist)
+        atoms = kd.getIndices()
+        distances = kd.getDistances()
+        G = molecule.connectivity
+        energy = 0
+        for a,r in zip(atoms, distances):
+            a1,a2 = a
+            if not G.has_edge(a1+1, a2+1):
+                e1,r1 = self.vdw[mol_id][a1]
+                e2,r2 = self.vdw[mol_id][a2]
+                rvdw = (r1+r2)/r
+                rvdw = rvdw**6
+                #Lennard-Jones
+                energy += np.sqrt(e1*e2)*(rvdw**2 - 2*rvdw)
+                #Electrostatic
+                #c1 = self.charges[mol_id][a1]
+                #c2 = self.charges[mol_id][a2]
+                #energy += c1*c2 / r
+        return energy
+    
+
+    def compute_environment_energy(self, mol_id):
+        """Computes the non bonded energy between a molecule and its environment. The environment is approximated by CA atom type
+        Parameters:
+            mol_id: id of molecule
+        """
+        XA = self.molecules[mol_id].atom_group.getCoords()
+        atoms = self.molecules[mol_id].atom_group.getSerials()-1
+        nbr_clashes = 0
+        r_env = 1.992400
+        e_env = -0.070000
+
+        energy = 0
+        if self.environment:
+            XB = self.environment.getCoords()
+            Y = distance.cdist(XA, XB, 'euclidean')
+            for a in atoms:
+                e1,r1 = self.vdw[mol_id][a]
+                e = np.sqrt(e1*e_env)
+                r = Y[a, :]
+                rvdw = ((r1+r_env)/r[r< self.cutoff_dist])**6
+                energy += e*np.sum(rvdw**2 - 2*rvdw)
+
+        for mol in np.arange(len(self.molecules)):
+            if mol == mol_id:
+                continue
+            XB = self.molecules[mol].atom_group.getCoords()
+            Y = distance.cdist(XA, XB, 'euclidean')
+            for a in atoms:
+                e1,r1 = self.vdw[mol_id][a-1]
+                e = np.sqrt(e1*e_env)
+                r = Y[a, :]
+                rvdw = ((r1+r_env)/r[r< self.cutoff_dist])**6
+                energy += e*np.sum(rvdw**2 - 2*rvdw)
+        return nbr_clashes 
+        
+    def compute_self_CG_energy(self, mol_id):
+        """
+        """
+        mol = self.molecules[mol_id]
+        sel = mol.atom_group.select(self.sel_CG[mol_id])
+        coords = sel.getCoords()
+        ids,rn = mol.get_ids(sel)
+        kd = KDTree(coords)
+        kd.search(self.cutoff_dist)
+        atoms = kd.getIndices()
+        distances = kd.getDistances()
+        energy = 0
+        for a,r in zip(atoms, distances):
+            a1,a2 = a
+            if ids[a1] != ids[a2]:
+                rvdw = (0.94820)/r
+                rvdw6 = rvdw**6
+                rvdw = (0.0059939)/r
+                rvdw12 = rvdw**12
+                #Lennard-Jones
+                energy += 4*0.43*(rvdw12 - rvdw6)
+                #Electrostatic
+                #c1 = self.charges[mol_id][a1]
+                #c2 = self.charges[mol_id][a2]
+                #energy += c1*c2 / r
+    
+        return energy
+
+
+    
     def remove_clashes(self, temp = 310, n = 1000, max_torsional = 0.3):
         """Monte Carlo sampling to remove clashes. The number of torsional anlges will decrease for max_torsional (fractions of total angles)
         to one single angle.
@@ -2191,9 +2412,11 @@ class Sampler():
 
         while i < n:
             mol_id = np.random.randint(n_mol)
-            clashes =  self.nbr_clashes[mol_id]
+            #clashes =  self.nbr_clashes[mol_id]
+            clashes =  self.non_bonded_energy[mol_id]
             torsionals = self.molecules[mol_id].torsionals
             nbr_torsionals = int(max_torsional * len(torsionals))
+            max_torsional -= max_torsional/n 
             t_ids  = np.random.randint(len(torsionals), size = nbr_torsionals)
             r_s = np.random.random_sample((nbr_torsionals,))
             lenergy = []
@@ -2211,8 +2434,10 @@ class Sampler():
                 theta = self.energy[e](r)
                 ctheta = self.molecules[mol_id].rotate_bond(int(t_id), theta, absolute = True)
                 dtheta.append(ctheta-theta)
-            clashes_new = self.count_total_clashes(mol_id)
-            print clashes_new,clashes
+            #clashes_new = self.count_total_clashes(mol_id)
+            clashes_new = self.compute_total_energy(mol_id)
+
+            #print clashes_new,clashes
             if clashes_new >= clashes:
                 if np.exp( -beta *(clashes_new - clashes) ) <  np.random.random_sample():
                     # set back initial configuration
@@ -2220,9 +2445,8 @@ class Sampler():
                         self.molecules[mol_id].rotate_bond(int(t_id), t)
                     continue
 
-            self.nbr_clashes[mol_id] = clashes_new
-            max_torsional -= max_torsional/n
-
+            #self.nbr_clashes[mol_id] = clashes_new
+            self.non_bonded_energy[mol_id] = clashes_new
 
 #####################################################################################
 #                                Sampler                                            #
