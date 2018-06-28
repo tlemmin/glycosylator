@@ -12,7 +12,7 @@ myGlycosylator.builder.Topology.read_topology('./support/topology/DUMMY.top')
 myGlycosylator.read_connectivity_topology('./support/topology/mannose.top')
 
 #myGlycosylator.assign_patches(myMan9)
-connect_tree = myGlycosylator.build_connectivity_tree(myMan9.rootRes, myMan9.interresidue_connectivity)
+#connect_tree = myGlycosylator.build_connectivity_tree(myMan9.rootRes, myMan9.interresidue_connectivity)
 print '################'
 man9, bonds9  = myGlycosylator.glycosylate(None, glycan_molecule = myMan9)
 print '################'

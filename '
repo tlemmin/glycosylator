@@ -1547,89 +1547,10 @@ class Glycosylator:
             filename: path 
         """
         glycosylated_protein = self.protein.copy()
-        count = 0
         for g in self.glycanMolecules.values():
-            print g.name
             glycosylated_protein += g.atom_group
-            count += 1
-            if count > 5:
-                break
             
         writePDB(filename, glycosylated_protein)
-    
-    def write_glycoprotein(self, filename):
-        """Numpy array requires a continous memory block. When merging several atomGroup, the memory explodes. This function will alocate the memory first and then transfer propreties of AtomGroup
-        """
-        natoms = self.protein.numAtoms()
-        for g in self.glycanMolecules.values():
-            natoms += g.atom_group.numAtoms()
-        
-        coords = np.zeros((natoms,3))
-        resn = []
-        resi = []
-        atoms_name = []
-        chid = []
-        segn = []
-        occupancy = []
-        beta = []
-        serial = []
-        element = []
-        icode = []
-        altloc = []
-
-        #inilizalize variable
-        ag = self.protein
-        natoms = ag.numAtoms()
-        coords[0:natoms, :] = ag.getCoords()
-        atoms_name += list(ag.getNames())
-        resn += list(ag.getResnames())
-        resi += list(ag.getResnums())
-        chid += list(ag.getChids())
-        segn += list(ag.getSegnames())
-        occupancy += list(ag.getOccupancies())
-        beta += list(ag.getBetas())
-        serials = range(1, natoms+1)
-        serial += serials
-        icode += list(ag.getIcodes())
-        element += list(ag.getElements())
-        altloc += list(ag.getAltlocs())
-
-        for g in self.glycanMolecules.values():
-            ag = g.atom_group
-            nnatoms = natoms+ag.numAtoms()
-            coords[natoms:nnatoms, :] = ag.getCoords()
-            resn += list(ag.getResnames())
-            resi += list(ag.getResnums())
-            chid += list(ag.getChids())
-            segn += list(ag.getSegnames())
-            occupancy += list(ag.getOccupancies())
-            beta += list(ag.getBetas())
-            atoms_name += list(ag.getNames())
-            serials = range(natoms+1, nnatoms+1)
-            serial += serials
-            icode += list(ag.getIcodes())
-            element += list(ag.getElements())
-            altloc += list(ag.getAltlocs())
-            natoms = nnatoms
-
-        glycoprotein = AtomGroup('Glycoprotein')
-        glycoprotein.setCoords(coords)
-
-        glycoprotein.setNames(atoms_name)
-        glycoprotein.setResnums(resi)
-        glycoprotein.setResnames(resn)
-        glycoprotein.setChids(chid)
-        glycoprotein.setSegnames(segn)
-        glycoprotein.setOccupancies(occupancy)
-        glycoprotein.setBetas(beta)
-        glycoprotein.setSerials(serial)
-        glycoprotein.setIcodes(icode)
-        glycoprotein.setElements(element)
-        glycoprotein.setAltlocs(altloc)
-        writePDB(filename, glycoprotein)
-        
-
-        
 
     def get_residue(self, res_id):
         """Returns an AtomGroup of given atom id; composed of 'segname,chain,resid,icode,atomName'
@@ -1885,11 +1806,6 @@ class Glycosylator:
                     #new_residue.setResnums([resid]*len(new_residue))
                     ics = self.builder.Topology.topology[glycan_topo[unit]]['IC']
                     self.builder.build_missing_atom_coord(new_residue, missing_atoms, ics)
-
-                    #Check if first residue is linked to other residue
-                    if link_residue and link_patch and not lunit:
-                        del_atom, b = self.builder.apply_patch(link_patch,  link_residue, new_residue)
-                        bonds.extend(b)
                 else:
                     print 'Error in connect tree!! Residue will be build de novo'
             #build first unit from DUMMY or from linked residue
@@ -1924,7 +1840,7 @@ class Glycosylator:
             else:
                 glycan = new_residue
             resid += 1
-
+            
         if dele_atoms:
             glycan = self.builder.delete_atoms(glycan, dele_atoms)
             # remove all non existing bonds
@@ -1963,22 +1879,18 @@ class Glycosylator:
         connect_topology['#UNIT'] = n_unit
         return connect_topology
     
-    def build_glycan_topology(self, patch = 'NGLB', glycanMolecules = None, build_all = True):
-        """Builds the topology of all identified glycans
+    def generate_glycan_topology(self, patch = 'NGLB', glycanMolecules = self.glycanMolecules, build_all = True):
+        """ Generates the topology of all identified glycans
         Parameters:
             patch: patch used to link glycan to protien
-            glycanMolecules: dictionary with id as key and Molecule instance as value. Default: glycans detected in by Glycosylator
-            build_all: boolean defining if the topology has to be rebuilt
-        """
-        glycanMolecules = glycanMolecules if glycanMolecules is not None else self.glycanMolecules
 
+        """
         for m in glycanMolecules:
             glycan_molecule = glycanMolecules[m]
-            residue = self.get_residue(m)
             if not glycan_molecule.atom_group:
                 continue
             if build_all:
-                atom_group, bonds  = self.glycosylate(None, glycan_molecule = glycan_molecule, link_residue = residue, link_patch = patch)
+                atom_group, bonds  = self.glycosylate(None, glycan_molecule = glycan_molecule)
                 glycan_molecule.set_AtomGroup(atom_group, rootAtom = atom_group.getSerials()[0], bonds=bonds)
             self.assign_patches(glycan_molecule)
             atom_type = self.assign_atom_type(glycan_molecule)
@@ -2254,11 +2166,7 @@ class Sampler():
             vdw = []
             for k in keys:
                 charge.append(charges[k])
-                e,r = vdw_parameters[types[k]][:2]
-                #increase the r_min for hydrogen atoms
-                if r < 1.:
-                    r = 1.340
-                vdw.append([e,r])
+                vdw.append(vdw_parameters[types[k]][:2])
 
             self.charges.append(charge)
             self.vdw.append(vdw)
@@ -2295,8 +2203,7 @@ class Sampler():
                 lookup.append(k)
             self.energy_lookup.append(lookup)
             mol_id += 1
-    
-    
+        
     def compute_inv_cum_sum_dihedral(self, par_list, n_points = 100):
         """Computes the an interpolation of the inverse transform sampling of a CHARMM
         dihedral term: sum(k*[1-cos(n*phi -d)]).
@@ -2382,9 +2289,9 @@ class Sampler():
         Parameters:
             mol_id: id of the molecule
         """
-        energy_self = self.compute_self_non_bonded_energy(mol_id)
-        energy = self.compute_environment_energy(mol_id)
-        return energy_self,energy
+        energy = self.compute_self_non_bonded_energy(mol_id)
+        energy += self.compute_environment_energy(mol_id)
+        return energy
 
     def compute_self_non_bonded_energy(self, mol_id):
         """ Computes the van der Waals and electrostatic interaction of glycan
@@ -2438,6 +2345,7 @@ class Sampler():
                 r = Y[a, :]
                 rvdw = ((r1+r_env)/r[r< self.cutoff_dist])**6
                 energy += e*np.sum(rvdw**2 - 2*rvdw)
+
         for mol in np.arange(len(self.molecules)):
             if mol == mol_id:
                 continue
@@ -2449,10 +2357,10 @@ class Sampler():
                 r = Y[a, :]
                 rvdw = ((r1+r_env)/r[r< self.cutoff_dist])**6
                 energy += e*np.sum(rvdw**2 - 2*rvdw)
-        return energy 
+        return nbr_clashes 
         
     
-    def remove_clashes(self, temp = 150, n = 1000, max_torsional = 0.3):
+    def remove_clashes(self, temp = 310, n = 1000, max_torsional = 0.3):
         """Monte Carlo sampling to remove clashes. The number of torsional anlges will decrease for max_torsional (fractions of total angles)
         to one single angle.
         Parameters:
@@ -2464,71 +2372,47 @@ class Sampler():
         beta   = 1 / ( R * temp)
         
         i = 0
-        i_skipped = 0
-
         n_mol = len(self.molecules)
-        energy = 0
-        for e,e2 in self.non_bonded_energy:
-            energy += e+e2 
-        print "Initial energy: ", energy
+        print n_mol
         while i < n:
             mol_id = np.random.randint(n_mol)
             #clashes =  self.nbr_clashes[mol_id]
-            energy_self,energy =  self.non_bonded_energy[mol_id]
+            clashes =  self.non_bonded_energy[mol_id]
             torsionals = self.molecules[mol_id].torsionals
             nbr_torsionals = int(max_torsional * len(torsionals))
             max_torsional -= max_torsional/n 
             t_ids  = np.random.randint(len(torsionals), size = nbr_torsionals)
             r_s = np.random.random_sample((nbr_torsionals,))
             lenergy = []
-            
-            if not len(t_ids):
-                # if more than five variable were skipped i should increase, in order to avoid infinit loop
-                if i_skipped == 5:
-                    i_skipped = 0
-                    i += 1
-                else:
-                    i_skipped += 1
-                continue
-
+            e = 'skip'
             for t_id in t_ids:
                 e = self.energy_lookup[mol_id][t_id]
                 if e == 'skip':
                     break
                 lenergy.append(e)
             if e == 'skip':
+                print 'skipping'
+                break
                 continue
             i += 1
             dtheta = []
-            atom_group_copy = self.molecules[mol_id].atom_group.copy()
             for e,r,t_id in zip(lenergy, r_s, t_ids):
                 theta = self.energy[e](r)
                 ctheta = self.molecules[mol_id].rotate_bond(int(t_id), theta, absolute = True)
                 dtheta.append(ctheta-theta)
-            energy_self_new,energy_new = self.compute_total_energy(mol_id)
+            #clashes_new = self.count_total_clashes(mol_id)
+            clashes_new = self.compute_total_energy(mol_id)
 
             #print clashes_new,clashes
-            if energy_new >= energy or energy_self_new >= energy_self:
-                if energy_new > 1e5 or energy_self_new > 1e5:
-                    e = -1 
-                    e_self = -1
-                else:
-                    e_self = np.exp( -beta *(energy_self_new - energy_self) )
-                    e = np.exp( -beta *(energy_new - energy) )
-                r = np.random.random_sample()
-                r_self = np.random.random_sample()
-                if (e < r) or (e_self < r_self):
+            if clashes_new >= clashes:
+                if np.exp( -beta *(clashes_new - clashes) ) <  np.random.random_sample():
                     # set back initial configuration
-                    self.molecules[mol_id].atom_group = atom_group_copy
-                    #for t_id, t in zip(t_ids, dtheta):
-                    #    self.molecules[mol_id].rotate_bond(int(t_id), t)
+                    for t_id, t in zip(t_ids, dtheta):
+                        self.molecules[mol_id].rotate_bond(int(t_id), t)
                     continue
-            self.non_bonded_energy[mol_id] = [energy_self_new, energy_new]
 
-        energy = 0 
-        for e,e1 in self.non_bonded_energy:
-            energy += e +  e1
-        print "Final energy: ", energy
+            #self.nbr_clashes[mol_id] = clashes_new
+            self.non_bonded_energy[mol_id] = clashes_new
 
 #####################################################################################
 #                                Sampler                                            #

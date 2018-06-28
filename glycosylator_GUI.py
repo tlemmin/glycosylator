@@ -62,7 +62,7 @@ class GlycosylatorGUI(tk.Tk):
         self.myGlycosylator = glc.Glycosylator(SELF_BIN +'/support/toppar_charmm/carbohydrates.rtf', SELF_BIN + '/support/toppar_charmm/carbohydrates.prm')
         self.myGlycosylator.builder.Topology.read_topology(SELF_BIN +'/support/topology/DUMMY.top')
         self.myDrawer = glc.Drawer()
-
+        
         #database variables
         self.user_glycans = {} 
         self.db_commong = SELF_BIN + '/test_db.db'
@@ -183,7 +183,7 @@ class GlycosylatorGUI(tk.Tk):
         
         self.glycosylate_button = tk.Button(self.right_frame, text="Glycosylate", command = self.glycosylate, width = 10)
 #        self.glycosylateAll_button = tk.Button(self.right_frame, text="Glycosylate all", width = 10)
-        self.clashes = tk.Button(self.right_frame, text="Remove clashes", width = 10)
+        self.clashes = tk.Button(self.right_frame, text="Remove clashes", width = 10, command = self.remove_clashes)
         # Layout right frame       
         i = 0
         self.w_logo.grid(column = 0, row =  i, sticky='N', pady=(1, 65)); i+=1
@@ -368,8 +368,8 @@ class GlycosylatorGUI(tk.Tk):
         filename = tkFileDialog.asksaveasfilename(initialdir = self.cwd, defaultextension=".pdb", filetypes = (("pdb files","*.pdb"),("all files","*.*"))) 
         if filename is None:
             return
-        self.myGlycosylator.glycans.update(self.linked_glycans)
-        self.myGlycosylator.save_glycoprotein(filename)
+        self.myGlycosylator.glycanMolecules.update(self.linked_glycanMolecules)
+        self.myGlycosylator.write_glycoprotein(filename)
 
 
     def show_database(self):
@@ -923,6 +923,29 @@ class GlycosylatorGUI(tk.Tk):
         # Update glycoprotein and sequon panels
         self.draw_glycoprotein(chid)
         self.draw_glycan(sequon)
+    
+
+    def remove_clashes(self):
+        """ Remove clashes from modeled glycans
+        """
+        dihe_parameters = self.myGlycosylator.builder.Parameters.parameters['DIHEDRALS']
+        vwd_parameters = self.myGlycosylator.builder.Parameters.parameters['NONBONDED']
+        
+        static_glycans = None
+        for k in self.original_glycanMolecules:
+            if k not in self.linked_glycanMolecules:
+                if static_glycans is not None:
+                    static_glycans += self.original_glycanMolecules[k].atom_group
+                else:
+                    static_glycans = self.original_glycanMolecules[k].atom_group.copy()
+        
+        environment = self.myGlycosylator.protein.copy() 
+        environment += static_glycans
+        
+        #Build topology
+        self.myGlycosylator.build_glycan_topology(glycanMolecules = self.linked_glycanMolecules, build_all = False)
+        sampler = glc.Sampler(self.linked_glycanMolecules.values(), environment, dihe_parameters, vwd_parameters)
+        sampler.remove_clashes(temp =  305, n = 200)
 
     def _set_propreties(self):
         """Allows user to ajust parameters to improve the rendering of the GUI (size and resolution)
