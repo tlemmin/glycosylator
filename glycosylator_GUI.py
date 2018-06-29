@@ -906,7 +906,8 @@ class GlycosylatorGUI(tk.Tk):
             original_glycan = self.original_glycanMolecules[key]
             r,t = self.original_glycans[key]
             connect_tree = self.myGlycosylator.build_connectivity_tree(r, t)
-            self.myGlycosylator.connect_topology['SELECTED'] = self.connect_tree_to_topology(self.myGlycosylator.build_connect_topology(original_glycan)) 
+            self.myGlycosylator.connect_topology['SELECTED'] = self.myGlycosylator.build_connect_topology(original_glycan) 
+#            self.myGlycosylator.connect_topology['SELECTED'] = self.connect_tree_to_topology(self.myGlycosylator.build_connect_topology(original_glycan)) 
             original_glycan = original_glycan.atom_group
         
         segname = 'G'+key.split(',')[2]
