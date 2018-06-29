@@ -31,12 +31,18 @@ from prody import *
 from itertools import izip
 from scipy.spatial import distance
 from scipy.interpolate import interp1d
+from scipy.optimize import minimize
+
 import sqlite3
 
 from matplotlib.patches import Circle, Rectangle, Polygon
 from matplotlib.collections import PatchCollection
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
+
+import time
+
+
 
 SELF_BIN = os.path.dirname(os.path.realpath(sys.argv[0]))
 #sys.path.insert(0, SELF_BIN + '/support')
@@ -634,6 +640,16 @@ class Molecule:
         if update_con:
             self.update_connectivity(update_bonds =  False)
 
+    def set_torsional_angles(self, torsionals, angles, absolute = True):
+        """Change the torsional angles for a list torsional list
+        Parameters:
+            torsionals_idx: list of torsional (index or name) angles which should be changed
+            angles: list of angles in degrees
+            absolute: define if the angles are 
+        """
+        for torsional,theta in zip(torsionals, angles):
+            self.rotate_bond(torsional, theta, absolute = absolute) 
+
     def set_AtomGroup(self, AGmolecule, rootAtom = 1, bonds = None, update_bonds = False):
         """Creates a Molecule instance from AtomGroup. 
         Parameters:
@@ -940,6 +956,22 @@ class Molecule:
         sel.setCoords(coords.transpose()+v2)
         return c_angle
 
+    def get_all_torsional_angles(self):
+        """Computes all the torsional angles of the molecule
+        Return:
+            angles: angles in degrees
+        """
+        angles = []
+        for torsional in self.torsionals:
+            vec_sel = self.atom_group.select('serial ' + ' '.join(map(str, torsional)))
+            c1,c2,c3,c4 = vec_sel.getCoords()
+            c12 = c1-c2
+            c12 = c12 / np.linalg.norm(c12)
+            c43 = c4-c3
+            c43 = c43 / np.linalg.norm(c43)
+            angles.append(np.rad2deg(np.cos(np.dot(c12,c43))))
+
+        return angles
 
 #####################################################################################
 #                                Builders                                            #
@@ -2235,6 +2267,8 @@ class Sampler():
         self.environment = envrionment
         self.clash_dist = clash_dist
         self.cutoff_dist =  10.
+        self.dihe_parameters = dihe_parameters
+        self.vdw_parameters = vdw_parameters
         self.energy = {}
         self.energy_lookup = []
         self.nbr_clashes = []
@@ -2295,7 +2329,7 @@ class Sampler():
                 lookup.append(k)
             self.energy_lookup.append(lookup)
             mol_id += 1
-    
+        self.non_bonded_energy = np.array(self.non_bonded_energy) 
     
     def compute_inv_cum_sum_dihedral(self, par_list, n_points = 100):
         """Computes the an interpolation of the inverse transform sampling of a CHARMM
@@ -2415,7 +2449,7 @@ class Sampler():
                 #c2 = self.charges[mol_id][a2]
                 #energy += c1*c2 / r
         return energy
-    
+
 
     def compute_environment_energy(self, mol_id):
         """Computes the non bonded energy between a molecule and its environment. The environment is approximated by CA atom type
@@ -2450,8 +2484,79 @@ class Sampler():
                 rvdw = ((r1+r_env)/r[r< self.cutoff_dist])**6
                 energy += e*np.sum(rvdw**2 - 2*rvdw)
         return energy 
-        
     
+    def compute_dihedral_energy(self, mol_id):
+        """ Computes the CHARMM torsional angles energy for a molecule
+        Parameter:
+            mol_id: index of molecule
+        Return:
+            energy: torsional energy of the molecule
+        """
+        lookup = self.energy_lookup[mol_id]
+        molecule = self.molecules[mol_id]
+        angles = molecule.get_all_torsional_angles()
+        energy = 0 
+        for phi,k in zip(angles,lookup):
+            par_list = self.dihe_parameters[k]
+            for p in par_list:
+                k,n,d = p
+                energy += k*(1-np.cos((n*phi -d)*np.pi / 180.))
+        return energy 
+
+    def compute_TotalEnergy(self, torsionals):
+        counter = 0
+        mol_id = 0
+        energy = 0
+        print torsionals
+        for molecule in self.molecules:
+            ncounter = counter + len(molecule.torsionals)
+            molecule.set_torsional_angles(molecule.torsionals, torsionals[counter:ncounter])
+            energy += np.sum(self.compute_total_energy(mol_id))
+            energy += self.compute_dihedral_energy(mol_id)
+            counter = ncounter
+            mol_id += 1
+        print energy
+        return energy
+    
+
+    def get_all_torsional_angles(self):
+        angles = []
+        for molecule in self.molecules:
+            angles += molecule.get_all_torsional_angles()
+        return angles
+
+    def minimize_molecules(self, mol_id = None):
+        torsionals = self.get_all_torsional_angles()
+        res = minimize(self.compute_TotalEnergy, torsionals, options = {'maxiter': 1})
+        self.compute_TotalEnergy(res)
+        return res
+    
+    def remove_clashes_GA(self):
+        creator.create("Fitness", base.Fitness, weights=(-1.0,))
+        creator.create("Individual", list, fitness=creator.Fitness)
+        toolbox = base.Toolbox()
+        toolbox.register("attr_torsional", random.randint, 0, 360)
+        toolbox.register("individual", tools.initRepeat, creator.Individual, 
+                toolbox.attr_float, 100)
+
+        toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+        toolbox.register("evaluate", compute_TotalEnergy)
+        toolbox.register("mate", tools.cxTwoPoint)
+        toolbox.register("mutate", tools.mutFlipBit, indpb=0.05)
+        toolbox.register("select", tools.selTournament, tournsize=3)
+        pop = toolbox.population(n=300)
+        hof = tools.HallOfFame(1)
+        stats = tools.Statistics(lambda ind: ind.fitness.values)
+        stats.register("avg", numpy.mean)
+        stats.register("std", numpy.std)
+        stats.register("min", numpy.min)
+        stats.register("max", numpy.max)
+
+        pop, log = algorithms.eaSimple(pop, toolbox, cxpb=0.5, mutpb=0.2, ngen=40, 
+                stats=stats, halloffame=hof, verbose=True)
+        return pop, log, hof
+
+
     def remove_clashes(self, temp = 150, n = 1000, max_torsional = 0.3):
         """Monte Carlo sampling to remove clashes. The number of torsional anlges will decrease for max_torsional (fractions of total angles)
         to one single angle.
@@ -2472,11 +2577,16 @@ class Sampler():
             energy += e+e2 
         print "Initial energy: ", energy
         while i < n:
-            mol_id = np.random.randint(n_mol)
-            #clashes =  self.nbr_clashes[mol_id]
+            #mol_id = np.random.randint(n_mol)
+            #look for highest energy glycans
+            idx = np.argsort(np.sum(self.non_bonded_energy, axis = 1))
+            mol_id = idx[-(np.random.randint(3)+1)]
+            mol_id = 14
+            #print '#', mol_id, self.non_bonded_energy[mol_id], '#'
             energy_self,energy =  self.non_bonded_energy[mol_id]
             torsionals = self.molecules[mol_id].torsionals
-            nbr_torsionals = int(max_torsional * len(torsionals))
+            nbr_torsionals = np.max([1,int(max_torsional * len(torsionals))])
+            nbr_torsionals = 1
             max_torsional -= max_torsional/n 
             t_ids  = np.random.randint(len(torsionals), size = nbr_torsionals)
             r_s = np.random.random_sample((nbr_torsionals,))
@@ -2502,9 +2612,10 @@ class Sampler():
             dtheta = []
             atom_group_copy = self.molecules[mol_id].atom_group.copy()
             for e,r,t_id in zip(lenergy, r_s, t_ids):
-                theta = self.energy[e](r)
-                ctheta = self.molecules[mol_id].rotate_bond(int(t_id), theta, absolute = True)
-                dtheta.append(ctheta-theta)
+                #theta = self.energy[e](r)
+                #ctheta = self.molecules[mol_id].rotate_bond(int(t_id), theta, absolute = True)
+                theta = (-1 + 2*np.random.randint(1))*np.random.uniform(5., 10.)
+                self.molecules[mol_id].rotate_bond(int(t_id), theta, absolute = False)
             energy_self_new,energy_new = self.compute_total_energy(mol_id)
 
             #print clashes_new,clashes
@@ -2520,8 +2631,6 @@ class Sampler():
                 if (e < r) or (e_self < r_self):
                     # set back initial configuration
                     self.molecules[mol_id].atom_group = atom_group_copy
-                    #for t_id, t in zip(t_ids, dtheta):
-                    #    self.molecules[mol_id].rotate_bond(int(t_id), t)
                     continue
             self.non_bonded_energy[mol_id] = [energy_self_new, energy_new]
 
@@ -2531,11 +2640,11 @@ class Sampler():
         print "Final energy: ", energy
 
 #####################################################################################
-#                                Sampler                                            #
+#                                Drawer                                            #
 #####################################################################################
     
 class Drawer():
-    """Class to sample conformations, based on a 
+    """Class to display glycans. 
     """
     def __init__(self):
         self.Symbols = {}

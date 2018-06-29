@@ -15,8 +15,10 @@ writePDB('88.pdb', myGlycosylator.glycanMolecules[',G,88,'].atom_group)
 #Detect clashes
 dihe_parameters = myGlycosylator.builder.Parameters.parameters['DIHEDRALS']
 vwd_parameters = myGlycosylator.builder.Parameters.parameters['NONBONDED']
-
 mySampler = GL.Sampler(myGlycosylator.glycanMolecules.values(), myGlycosylator.protein, dihe_parameters, vwd_parameters)
-mySampler.remove_clashes(temp =  305, n = 100)
+#torsionals = mySampler.get_all_torsional_angles()
+#mySampler.compute_TotalEnergy(torsionals)
+mySampler.minimize_molecules()
+#mySampler.remove_clashes(temp =  305, n = 500, max_torsional = 0.3)
 myGlycosylator.write_glycoprotein('HIV_test.pdb')
 
