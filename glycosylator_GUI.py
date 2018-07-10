@@ -946,7 +946,7 @@ class GlycosylatorGUI(tk.Tk):
         #Build topology
         self.myGlycosylator.build_glycan_topology(glycanMolecules = self.linked_glycanMolecules, build_all = False)
         sampler = glc.Sampler(self.linked_glycanMolecules.values(), environment, dihe_parameters, vwd_parameters)
-        sampler.remove_clashes(temp =  305, n = 200)
+        sampler.remove_clashes_GA()
 
     def _set_propreties(self):
         """Allows user to ajust parameters to improve the rendering of the GUI (size and resolution)

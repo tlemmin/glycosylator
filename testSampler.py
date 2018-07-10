@@ -18,7 +18,8 @@ vwd_parameters = myGlycosylator.builder.Parameters.parameters['NONBONDED']
 mySampler = GL.Sampler(myGlycosylator.glycanMolecules.values(), myGlycosylator.protein, dihe_parameters, vwd_parameters)
 #torsionals = mySampler.get_all_torsional_angles()
 #mySampler.compute_TotalEnergy(torsionals)
-mySampler.minimize_molecules()
-#mySampler.remove_clashes(temp =  305, n = 500, max_torsional = 0.3)
+#mySampler.minimize_molecules()
+mySampler.remove_clashes_GA()
+#mySampler.remove_clashes()
 myGlycosylator.write_glycoprotein('HIV_test.pdb')
 
