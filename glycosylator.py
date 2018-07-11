@@ -2288,7 +2288,7 @@ class Sampler():
         self.non_bonded_energy = []
         self.charges = [] 
         self.vdw = [] 
-        
+        self.exclude1_3 = [] 
 
         mol_id =  0
         for molecule in self.molecules:
@@ -2310,6 +2310,8 @@ class Sampler():
             self.charges.append(charge)
             self.vdw.append(vdw)
             lookup = []
+            
+            self.build_1_3_exclude_list(mol_id)
             self.nbr_clashes.append(self.count_total_clashes(mol_id))
             self.non_bonded_energy.append(self.compute_total_energy(mol_id))
 
@@ -2365,6 +2367,20 @@ class Sampler():
         inv_cdf = interp1d(cum_values, phi)
         return inv_cdf
 
+    def build_1_3_exclude_list(self, mol_id):
+        """list with set of neighboring atoms
+        """
+        molecule = self.molecules[mol_id]
+        G = molecule.connectivity
+        nbr_clashes = 0
+        exclude_mol = []
+        for a in sorted(G.nodes()):
+            exclude = set()
+            for n in G.neighbors(a):
+                exclude.add(n)
+                exclude.update(G.neighbors(n))
+            exclude_mol.append(exclude)
+        self.exclude1_3.append(exclude_mol)
     
     def count_total_clashes(self, mol_id):
         """Counts the total number of clashes in the system. 
@@ -2374,7 +2390,7 @@ class Sampler():
         Parameters:
             mol_id: id of the molecule
         """
-        nbr_clashes,clashes = self.count_self_clashes(mol_id)
+        nbr_clashes = self.count_self_clashes(mol_id)
         nbr_clashes += self.count_environment_clashes(mol_id)
         return nbr_clashes
 
@@ -2393,12 +2409,11 @@ class Sampler():
         atoms = kd.getIndices()
         G = molecule.connectivity
         nbr_clashes = 0
-        clashes = []
+        exclude_mol = self.exclude1_3[mol_id]
         for a1,a2 in atoms:
-            if not G.has_edge(a1+1, a2+1):
+            if a1+1 not in exclude_mol[a2]:
                 nbr_clashes += 1
-                #clashes += (a1+1,a2+1)
-        return nbr_clashes,clashes
+        return nbr_clashes
     
     def count_environment_clashes(self, mol_id):
         """Counts the number of a molecule and its environment
@@ -2408,7 +2423,7 @@ class Sampler():
         XA = self.molecules[mol_id].atom_group.getCoords()
         nbr_clashes = 0
         if self.environment:
-            XB = self.environment.getCoords()
+            XB = self.environment.select('not resname ASN').getCoords()
             Y = distance.cdist(XA, XB, 'euclidean')
             nbr_clashes += np.sum(Y < self.clash_dist + 1.0)
 
@@ -2438,7 +2453,7 @@ class Sampler():
         return energy_self,energy
     
 
-    def compute_self_non_bonded_energy(self, mol_id, repultion = 0.3):
+    def compute_self_non_bonded_energy(self, mol_id, repulsion = 0.0):
         """ Computes the van der Waals and electrostatic interaction of glycan
         The non bonded energy will be computed for all atoms, except those connected by a bond
         Parameters:
@@ -2453,12 +2468,13 @@ class Sampler():
         distances = kd.getDistances()
         G = molecule.connectivity
         energy = 0
+        exclude_mol = self.exclude1_3[mol_id]
         for a,r in zip(atoms, distances):
             a1,a2 = a
-            if not G.has_edge(a1+1, a2+1):
+            if a1+1 not in exclude_mol[a2]:
                 e1,r1 = self.vdw[mol_id][a1]
                 e2,r2 = self.vdw[mol_id][a2]
-                rvdw = (r1+r2+repultion)/r
+                rvdw = (r1+r2+repulsion)/r
                 rvdw = rvdw**6
                 #Lennard-Jones
                 energy += np.sqrt(e1*e2)*(rvdw**2 - 2*rvdw)
@@ -2477,13 +2493,13 @@ class Sampler():
         XA = self.molecules[mol_id].atom_group.getCoords()
         atoms = self.molecules[mol_id].atom_group.getSerials()-1
         nbr_clashes = 0
-        #r_env = 1.992400
-        r_env =  3.0 
+        r_env = 1.992400
+        #r_env =  3.0 
         e_env = -0.070000
 
         energy = 0
         if self.environment:
-            XB = self.environment.getCoords()
+            XB = self.environment.select('not resname ASN').getCoords()
             Y = distance.cdist(XA, XB, 'euclidean')
             for a in atoms:
                 e1,r1 = self.vdw[mol_id][a]
@@ -2491,6 +2507,7 @@ class Sampler():
                 r = Y[a, :]
                 rvdw = ((r1+r_env)/r[r< self.cutoff_dist])**6
                 energy += e*np.sum(rvdw**2 - 2*rvdw)
+       
         for mol in np.arange(len(self.molecules)):
             if mol == mol_id:
                 continue
@@ -2558,8 +2575,8 @@ class Sampler():
             t_id = 0
             for t in torsionals:
                 e = self.energy_lookup[mol_id][t_id]
-                #thetas.append(t*360)
                 thetas.append(self.energy[e](t))
+                #thetas.append(t*360)
                 t_id += 1
             molecule.set_torsional_angles(molecule.torsionals, thetas)
             mol_id += 1
@@ -2655,7 +2672,7 @@ class Sampler():
             idx = np.argwhere(np.random.rand(len(offspring)) < mutation_rate)
             offspring[idx] = np.random.rand(len(idx))
 
-    def remove_clashes_GA(self, n_generation = 40, pop_size=30, mutation_rate=0.05, crossover_rate=0.9):
+    def remove_clashes_GA(self, n_generation = 40, pop_size=30, mutation_rate=0.06, crossover_rate=0.9):
         torsionals,n_torsionals = self._get_all_torsional_angles()
         length = len(torsionals)
         self.population = np.random.rand(pop_size, length)
@@ -2673,7 +2690,7 @@ class Sampler():
             mates = self._select_fit(sorted_population)
             t2 = time.time()
 
-            if i == n_generation/2:
+            if i == n_generation/3:
                 print "Evaluating self energy and reducing the size of the population"
                 clash = False
                 fast =  True
@@ -2691,7 +2708,7 @@ class Sampler():
             print "New population time: ", t2-t1
             i += 1 
             print "="*70
-        sorted_population = self._evaluate_population()
+        sorted_population = self._evaluate_population(clash = clash, fast = fast)
         self._build_individue(self.population[sorted_population[0]])
         
 

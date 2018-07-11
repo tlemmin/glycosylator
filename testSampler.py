@@ -19,7 +19,7 @@ mySampler = GL.Sampler(myGlycosylator.glycanMolecules.values(), myGlycosylator.p
 #torsionals = mySampler.get_all_torsional_angles()
 #mySampler.compute_TotalEnergy(torsionals)
 #mySampler.minimize_molecules()
-mySampler.remove_clashes_GA()
+mySampler.remove_clashes_GA(n_generation = 30)
 #mySampler.remove_clashes()
 myGlycosylator.write_glycoprotein('HIV_test.pdb')
 
