@@ -29,9 +29,11 @@ import numpy as np
 import networkx as nx
 from prody import *
 from itertools import izip
+from collections import defaultdict
 from scipy.spatial import distance
 from scipy.interpolate import interp1d
-from scipy.optimize import minimize
+from scipy.optimize import minimize, newton
+from scipy import optimize 
 import random
 from operator import itemgetter
 import sqlite3
@@ -609,7 +611,16 @@ class Molecule:
         """returns a dictironary with the residue ids as keys and residue names as values
         """
         return nx.get_node_attributes(self.interresidue_connectivity, 'resname')
+    
+    def get_patches(self):
+        """returns a dictironary with the residue ids as keys and patches as values
+        """
+        return nx.get_edge_attributes(self.interresidue_connectivity, 'patch')
 
+    def get_connectivity_atoms(self):
+        """returns a dictironary with the residue ids as keys and patches as values
+        """
+        return nx.get_edge_attributes(self.interresidue_connectivity, 'atoms')
 
     def update_connectivity(self, update_bonds = True):
         """Updates all the connectivity (bond, angles, dihedrals and graphs)
@@ -664,8 +675,8 @@ class Molecule:
         self.rootAtom = rootAtom
         if len(chain) == 1 and len(segn) == 1:
             self.atom_group = AGmolecule
-            self.chain = chain
-            self.segn = segn
+            self.chain = chain.pop()
+            self.segn = segn.pop()
             a1 = self.atom_group.select('serial ' + str(self.rootAtom))
             segn = a1.getSegnames()
             chid = a1.getChids()
@@ -986,6 +997,57 @@ class Molecule:
 
         return angles
 
+    def measure_dihedral_angle(self, torsional):
+        vec_sel = self.atom_group.select('serial ' + ' '.join(map(str, torsional)))
+        c0,c1,c2,c3 = vec_sel.getCoords()
+        b0 = -1.0*(c1 - c0)
+        b1 = c2 - c1
+        b2 = c3 - c2
+
+        b1 /= np.linalg.norm(b1)
+        v = b0 - np.dot(b0, b1)*b1
+        w = b2 - np.dot(b2, b1)*b1
+        x = np.dot(v, w)
+        y = np.dot(np.cross(b1, v), w)
+        return np.degrees(np.arctan2(y, x))
+
+    def get_interresidue_torsionals(self, patches):
+        connectivity_patches = self.get_patches()
+        ids = nx.get_node_attributes(self.connectivity, 'id')
+        inv_ids = {v: k for k, v in ids.iteritems()} 
+        interresidue_torsionals = {}
+        
+        for r in connectivity_patches.keys():
+            patch = connectivity_patches[r]
+            #skip if unknown patch
+            if patch not in patches:
+                continue
+            dihedrals = patches[patch]
+            r1,r2 = r
+            torsionals_idx = []
+            delta_angles = []
+            for dihe in dihedrals:
+                atoms = dihe[0]
+                serials = []
+                #get id of central atoms
+                for a in atoms:
+                    if a[0] == '1':
+                        serials.append(inv_ids[r1 + ',' + a[1:]])
+                    else:
+                        serials.append(inv_ids[r2 + ',' + a[1:]])
+                #search for torsional angle index and measure delta angle
+                idx_t = 0
+                for t in self.torsionals:
+                    if serials[1] == t[1] and serials[2] == t[2]:
+                        delta_angles.append(self.measure_dihedral_angle(t) - self.measure_dihedral_angle(serials))
+                        torsionals_idx.append(idx_t)
+                        break
+                    idx_t += 1
+            interresidue_torsionals['-'.join(map(str, torsionals_idx))] = [patch, delta_angles]
+        return interresidue_torsionals
+
+
+
 #####################################################################################
 #                                Builders                                            #
 #####################################################################################
@@ -1078,10 +1140,10 @@ class MoleculeBuilder:
         """
         dst_atom.setCoords(src_atom.getCoords())
         dst_atom.setNames(src_atom.getNames())
-        dst_atom.setResnums(src_atom.getResnums())
+#        dst_atom.setResnums(src_atom.getResnums())
         dst_atom.setResnames(src_atom.getResnames())
-        dst_atom.setChids(src_atom.getChids())
-        dst_atom.setSegnames(src_atom.getSegnames())
+#        dst_atom.setChids(src_atom.getChids())
+#        dst_atom.setSegnames(src_atom.getSegnames())
         dst_atom.setOccupancies(src_atom.getOccupancies())
         dst_atom.setBetas(src_atom.getBetas())
         dst_atom.setSerials(src_atom.getSerials())
@@ -1089,7 +1151,7 @@ class MoleculeBuilder:
         dst_atom.setElements(src_atom.getElements())
         dst_atom.setAltlocs(src_atom.getAltlocs())
         
-    def add_missing_atoms(self, residue, resid = None):
+    def add_missing_atoms(self, residue, resid = None, chain = None, segname = None):
         """Add all missing atoms to a ProDy residue from topology
         Parameters:
             residue: ProDy residue (AtomGroup)
@@ -1100,7 +1162,11 @@ class MoleculeBuilder:
         """
         if not resid:
             resid = residue.getResnums()[0]
-        complete_residue,atoms,bonds = self.init_new_residue(resid, residue.getResnames()[0], residue.getChids()[0], residue.getSegnames()[0])
+        if not chain:
+            chain = residue.getChids()[0]
+        if not segname:
+            segname = residue.getSegnames()[0]
+        complete_residue,atoms,bonds = self.init_new_residue(resid, residue.getResnames()[0], chain, segname)
         missing_atoms = []
         atoms_in_residue = residue.getNames()
         for a in atoms:
@@ -1123,9 +1189,11 @@ class MoleculeBuilder:
             bonds: list of all new bonds
             dele_atoms: list of atoms which should be deleted
         """
-        
-        dele_atoms = self.dele_atoms(patch, residue1, residue2)
-        bonds = self.patch_bonds(patch, residue1, residue2)
+        bonds = []
+        dele_atoms = []
+        if patch:
+            dele_atoms = self.dele_atoms(patch, residue1, residue2)
+            bonds = self.patch_bonds(patch, residue1, residue2)
         return dele_atoms,bonds
 
     def build_IC_graph(self, atoms, ics):
@@ -1227,26 +1295,27 @@ class MoleculeBuilder:
         Returns:
             dele_atoms: list of atoms to delete. (segn, chid, resi, atom_name)
         """
-        atoms = self.Topology.patches[patch]['dele']
         dele_atoms = []
-        segn1 = residue1.getSegnames()[0] 
-        chid1 = residue1.getChids()[0]
-        resi1 = str(residue1.getResnums()[0])
-        ic1 = str(residue1.getIcodes()[0])
-        if residue2:
-            segn2 = residue2.getSegnames()[0] 
-            chid2 = residue2.getChids()[0]
-            resi2 = str(residue2.getResnums()[0])
-            ic2 = str(residue2.getIcodes()[0])
+        if patch:
+            atoms = self.Topology.patches[patch]['dele']
+            segn1 = residue1.getSegnames()[0] 
+            chid1 = residue1.getChids()[0]
+            resi1 = str(residue1.getResnums()[0])
+            ic1 = str(residue1.getIcodes()[0])
+            if residue2:
+                segn2 = residue2.getSegnames()[0] 
+                chid2 = residue2.getChids()[0]
+                resi2 = str(residue2.getResnums()[0])
+                ic2 = str(residue2.getIcodes()[0])
 
-        for a in atoms:
-            if a[0] == '1':
-                dele_atoms.append('%s,%s,%s,%s,%s'%(segn1, chid1, resi1, ic1, a[1:]))
-            if a[0] == '2':
-                if residue2:
-                    dele_atoms.append('%s,%s,%s,%s,%s'%(segn2, chid2, resi2, ic2, a[1:]))
-                else:
-                    print "Warning: missing residue2 required for patch " + patch
+            for a in atoms:
+                if a[0] == '1':
+                    dele_atoms.append('%s,%s,%s,%s,%s'%(segn1, chid1, resi1, ic1, a[1:]))
+                if a[0] == '2':
+                    if residue2:
+                        dele_atoms.append('%s,%s,%s,%s,%s'%(segn2, chid2, resi2, ic2, a[1:]))
+                    else:
+                        print "Warning: missing residue2 required for patch " + patch
         return dele_atoms
 
     def delete_atoms(self, molecule, dele_atoms):
@@ -1584,6 +1653,8 @@ class Glycosylator:
             self.sequons.update(self.find_sequons(sel, self.sequences[i]))
 
         self.glycans,self.names = self.find_glycans('NGLB', 'ASN')
+        for g in self.glycans.values():
+            nx.set_node_attributes(g[1], self.names, 'resname')
         self.extract_glycans()
 
     def save_glycoprotein(self, filename):
@@ -1594,7 +1665,6 @@ class Glycosylator:
         glycosylated_protein = self.protein.copy()
         count = 0
         for g in self.glycanMolecules.values():
-            print g.name
             glycosylated_protein += g.atom_group
             count += 1
             if count > 5:
@@ -1753,10 +1823,11 @@ class Glycosylator:
             rn1 = rn[a1]
             id2 = ids[a2]
             rn2 = rn[a2]
-
+            
             if id1 != id2:
                 e = (id1, id2)
                 G.add_edge(*e)
+                
         names = self.connect_all_glycans(G)
         glycans = {}
         for graph in list(nx.connected_component_subgraphs(G)):
@@ -1791,12 +1862,13 @@ class Glycosylator:
             sel_all.append(sel)
             glycan = Molecule(k)
             glycan.set_AtomGroup(self.glycoprotein.select(sel).copy(), rootAtom = rootAtom)
+            glycan.interresidue_connectivity = g.copy()
             self.assign_patches(glycan) 
             self.glycanMolecules[k] = glycan
         self.protein = self.glycoprotein.select('not ((' + ') or ('.join(sel_all) + '))').copy()
      
     def connect_all_glycans(self, G):
-        """Builds a connectivity graph for molecules (not protein) in AtomGroup
+        """Builds a connectivity graph for molecules (not protein) in AtomGroup. Edges with unknown patches will be removed
             Parameters:
                 G: undirected graph of connected elements
             Returns:
@@ -1826,7 +1898,8 @@ class Glycosylator:
                 an1 = atom_names[a1]
                 an2 = atom_names[a2]
                 patch = self.find_patch(an1, an2)
-                G.add_edge(id1, id2, patch = patch, atoms = an1 + ':' + an2)
+                if patch:
+                    G.add_edge(id1, id2, patch = patch, atoms = an1 + ':' + an2)
                 #G.add_edge(*e)
                 names[id1] = rn1
                 names[id2] = rn2
@@ -1882,9 +1955,10 @@ class Glycosylator:
         if glycan_name in self.connect_topology:
             glycan_topo = self.get_connectivity_tree(glycan_name)
         elif glycan_molecule:
+            chain = glycan_molecule.get_chain()
+            segname = glycan_molecule.get_segname()
             self.assign_patches(glycan_molecule)
-            glycan_topo = self.build_glycan_topo(glycan_molecule)
-            template_glycan_tree = self.build_connectivity_tree(glycan_molecule.rootRes, glycan_molecule.interresidue_connectivity)
+            glycan_topo,template_glycan_tree = self.build_glycan_topo(glycan_molecule)
             template_glycan = glycan_molecule.atom_group
         else:
             print "Unkown Glycan"
@@ -1897,11 +1971,12 @@ class Glycosylator:
         dele_atoms = []
         if template_glycan_tree and template_glycan:
             inv_template_glycan_tree = {v: k for k, v in template_glycan_tree.items()}
-            resid = template_glycan.getResnums()[-1] + 1
-            chain = template_glycan.getChids()[0]
-            segname = template_glycan.getSegnames()[0]
+            #resid = template_glycan.getResnums()[-1] + 1
+            #chain = template_glycan.getChids()[0]
+            #segname = template_glycan.getSegnames()[0]
         
-        
+        resids = []
+        resid = 1
         sorted_units =  sorted(glycan_topo.keys(), key = len)
         for unit in sorted_units:
             new_residue = None
@@ -1913,7 +1988,6 @@ class Glycosylator:
                 previous = ''
 
             del_atom = []
-
             #check if residue exists
             if unit in inv_template_glycan_tree:
                 sel  = []
@@ -1923,11 +1997,17 @@ class Glycosylator:
                         sel.append(p + ' ' + s)
                 sel = ' and '.join(sel)
                 sel_residue = template_glycan.select(sel)
+                resid =  sel_residue.getResnums()[0]
+                if resid not in resids:
+                    resids.append(resid)
+                else:
+                    resid = resids.sort()[-1] + 1
+                    resids.append(resid)
+                
                 if sel_residue.getResnames()[0] == glycan_topo[unit]:
                     built_glycan[unit] = ','.join([segname, chain, str(resid),])
                     #built_glycan[unit] = inv_template_glycan_tree[unit]
-                    new_residue,missing_atoms,bonds = self.builder.add_missing_atoms(sel_residue, resid)
-                    #new_residue.setResnums([resid]*len(new_residue))
+                    new_residue,missing_atoms,bonds = self.builder.add_missing_atoms(sel_residue, resid, chain, segname)
                     ics = self.builder.Topology.topology[glycan_topo[unit]]['IC']
                     self.builder.build_missing_atom_coord(new_residue, missing_atoms, ics)
 
@@ -1937,7 +2017,11 @@ class Glycosylator:
                         bonds.extend(b)
                 else:
                     print 'Error in connect tree!! Residue will be build de novo'
+            
             #build first unit from DUMMY or from linked residue
+            if resid not in resids:
+                resids.append(resid)
+                
             if not lunit and not new_residue:
                 if link_residue and link_patch:
                     new_residue, del_atom, bonds = self.builder.build_from_patch(link_residue, resid, glycan_topo[unit], chain, segname, link_patch)
@@ -1963,7 +2047,6 @@ class Glycosylator:
             built_glycan[unit] = ','.join([segname, chain, str(resid),])
             dele_atoms += del_atom
             glycan_bonds.extend(bonds)
-            
             if glycan:
                 glycan += new_residue
             else:
@@ -2059,14 +2142,19 @@ class Glycosylator:
         G = molecule.interresidue_connectivity
         patches = {}
         atoms = nx.get_edge_attributes(G, 'atoms')
+        unknown_edges = []
         for e in G.edges():
             a1,a2 = atoms[e].split(':')
             patch = self.find_patch(a1, a2)
             if not patch:
-                print 'Unknown inter residue bond', a1, a2
+                #print 'Unknown inter residue bond', a1, a2
+                unknown_edges.append(e)
+                continue
             u,v=e
             G[u][v]['patch'] = patch
-        
+        for e in unknown_edges:
+            G.remove_edge(*e)
+
     def build_connectivity_tree(self, root_id, G):
         """Defines the connectivity within a glycan polymer
            Parameters:
@@ -2079,7 +2167,6 @@ class Glycosylator:
         #put root residue in dict
         connect_tree = {}
         connect_tree[root_id] = ' '
-        
         for n in paths:
             p = paths[n]
             edges = zip(p[1:],p[:-1])
@@ -2122,8 +2209,8 @@ class Glycosylator:
         glycan_topo = {}
         for r in connect_tree.keys():
                 glycan_topo[connect_tree[r]] = G.node[r]['resname']
-
-        return glycan_topo 
+        
+        return glycan_topo,connect_tree 
 
     def identify_glycan(self, molecule):
         """Identifies glycan name
@@ -2284,14 +2371,19 @@ class Sampler():
         self.vdw_parameters = vdw_parameters
         self.energy = {}
         self.energy_lookup = []
-        self.nbr_clashes = []
+        self.nbr_clashes = np.zeros(len(self.molecules))
         self.non_bonded_energy = []
         self.charges = [] 
         self.vdw = [] 
-        self.exclude1_3 = [] 
-
+        self.exclude1_3 = []
+        self.genes = []
+        self.sample = []
+        self.parse_patches('support/topology/pres.top')
+        self.interresidue_torsionals = []
         mol_id =  0
         for molecule in self.molecules:
+            self.sample.append(True)
+            self.genes.append(None)
             types = nx.get_node_attributes(molecule.connectivity, 'type')
             keys = types.keys()
             keys.sort()
@@ -2312,8 +2404,12 @@ class Sampler():
             lookup = []
             
             self.build_1_3_exclude_list(mol_id)
-            self.nbr_clashes.append(self.count_total_clashes(mol_id))
-            self.non_bonded_energy.append(self.compute_total_energy(mol_id))
+            #self.nbr_clashes.append(self.count_total_clashes(mol_id))
+            #self.non_bonded_energy.append(self.compute_total_energy(mol_id))
+            self.count_total_clashes(mol_id)
+            self.compute_total_energy(mol_id)
+            
+            self.interresidue_torsionals.append(molecule.get_interresidue_torsionals(self.patches))
 
             for dihe in molecule.torsionals:
                 atypes = []
@@ -2361,11 +2457,41 @@ class Sampler():
             k,n,d = p
             energy += (0.01+k)*(1-np.cos((n*phi -d)*np.pi / 180.))
         energy = np.max(energy) - energy
+        energy = energy -np.min(energy)
         energy = energy / np.sum(energy[1:]*np.diff(phi))
         cum_values = np.zeros(energy.shape)
         cum_values[1:] = np.cumsum(energy[1:]*np.diff(phi))
-        inv_cdf = interp1d(cum_values, phi)
+        #plt.plot(cum_values, phi)
+        inv_cdf = interp1d(cum_values, phi, fill_value="extrapolate")
         return inv_cdf
+    
+    def parse_patches(self, fname):
+        lines  = readLinesFromFile(fname)
+        self.patches = defaultdict(list) 
+        for line in lines:
+            line = line.split('\n')[0].split('!')[0].split() #remove comments and endl
+            if line:
+                if line[0]=='PRES':
+                    patch = line[1]
+                if line[0]=='DIHE':
+                    dihe = [line[1:5], list(pairwise(map(float, line[5:])))] 
+                    self.patches[patch].append(dihe) 
+
+    def get_uniform(self, interp_fn, angle):
+        """Returns a number between [0:1[ which corresponds to an angle, 
+        based on the distribution of angle energy.
+        Parameters:
+            inter_fn: interpolate object
+            angle: angle in degrees
+
+        Return:
+            root: number between [0:1[
+        """
+        if angle > 180:
+            angle -=180
+        interp_fn2 = lambda x: interp_fn(x) - angle
+        r = optimize.root(interp_fn2, .5, method = 'lm')
+        return r.x[0]
 
     def build_1_3_exclude_list(self, mol_id):
         """list with set of neighboring atoms
@@ -2382,7 +2508,7 @@ class Sampler():
             exclude_mol.append(exclude)
         self.exclude1_3.append(exclude_mol)
     
-    def count_total_clashes(self, mol_id):
+    def count_total_clashes(self, mol_id, increment =  False):
         """Counts the total number of clashes in the system. 
         Performed in two steps:
                 - count the number of clashes within a molecules (KDTree)
@@ -2390,18 +2516,20 @@ class Sampler():
         Parameters:
             mol_id: id of the molecule
         """
-        nbr_clashes = self.count_self_clashes(mol_id)
-        nbr_clashes += self.count_environment_clashes(mol_id)
-        return nbr_clashes
+        nbr_clashes = self.count_self_clashes(mol_id, increment = increment)
+        nbr_clashes += self.count_environment_clashes(mol_id, increment = increment)
+        if not increment:
+            self.nbr_clashes[mol_id] =  nbr_clashes
+        return self.nbr_clashes[mol_id]
 
-    def count_self_clashes(self, mol_id):
+    def count_self_clashes(self, mol_id, increment = False):
         """Counts the number of clashes for a molecule
         KDTree based
         Parameters:
             mol_id: id of molecule to consider 
+            increment: should the overwrite or update nbr_clashes
         Returns
             nbr_clashes: the number of clashes
-            clashes: list of clashing atom serial numbers
         """
         molecule = self.molecules[mol_id]
         kd = KDTree(molecule.atom_group.getCoords())
@@ -2413,26 +2541,43 @@ class Sampler():
         for a1,a2 in atoms:
             if a1+1 not in exclude_mol[a2]:
                 nbr_clashes += 1
+        if increment:
+            self.nbr_clashes[mol_id] += nbr_clashes
+        else:
+            self.nbr_clashes[mol_id] = nbr_clashes
         return nbr_clashes
     
-    def count_environment_clashes(self, mol_id):
+    def count_environment_clashes(self, mol_id, increment = False):
         """Counts the number of a molecule and its environment
         Parameters:
             mol_id: id of molecule
+            increment: overwite or increment nbr_clashes. If increment assumes that clashes have already been computed for all molecules < mol_id
         """
         XA = self.molecules[mol_id].atom_group.getCoords()
         nbr_clashes = 0
         if self.environment:
             XB = self.environment.select('not resname ASN').getCoords()
             Y = distance.cdist(XA, XB, 'euclidean')
-            nbr_clashes += np.sum(Y < self.clash_dist + 1.0)
+            nbr_clashes += np.sum(Y < self.clash_dist)
 
-        for mol in np.arange(len(self.molecules)):
+        start = 0
+        if increment:
+            start = mol_id + 1
+
+        for mol in np.arange(start, len(self.molecules)):
             if mol == mol_id:
                 continue
             XB = self.molecules[mol].atom_group.getCoords()
             Y = distance.cdist(XA, XB, 'euclidean')
-            nbr_clashes += np.sum(Y < self.clash_dist + 1.0)
+            nbr = np.sum(Y < self.clash_dist)
+            if increment:
+                self.nbr_clashes[mol] += nbr
+            nbr_clashes += nbr
+
+        if increment:
+            self.nbr_clashes[mol_id] += nbr_clashes
+        else:
+            self.nbr_clashes[mol_id] = nbr_clashes
         return nbr_clashes 
     
     def compute_total_energy(self, mol_id, fast= False, threshold=1e5):
@@ -2494,7 +2639,6 @@ class Sampler():
         atoms = self.molecules[mol_id].atom_group.getSerials()-1
         nbr_clashes = 0
         r_env = 1.992400
-        #r_env =  3.0 
         e_env = -0.070000
 
         energy = 0
@@ -2550,7 +2694,6 @@ class Sampler():
             energy += self.compute_dihedral_energy(mol_id)
             counter = ncounter
             mol_id += 1
-        print energy
         return energy
     
 
@@ -2559,26 +2702,65 @@ class Sampler():
         n_torsionals = []
         for molecule in self.molecules:
             a = molecule.get_all_torsional_angles()
-            n_torsionals = len(a)
+            n_torsionals.append(len(a))
             angles += a
-
         return angles,n_torsionals
-    
+
+    def _build_individue_from_angles(self):
+        i = 0
+        #set torsional angles
+        mol_id = 0
+        individue = []
+        for molecule in self.molecules:
+            torsionals = molecule.get_all_torsional_angles()
+            thetas = []
+            t_id = 0
+            for t in torsionals:
+                e = self.energy_lookup[mol_id][t_id]
+                individue.append(self.get_uniform(self.energy[e], t))
+                t_id += 1
+            mol_id += 1
+        return individue
+
+    def _eugenics(self):
+        i = 0
+        mol_id = 0
+        for molecule, interresidue in zip(self.molecules, self.interresidue_torsionals):
+            n = len(molecule.torsionals)
+            torsionals = self.population[:, i:i+n]
+            for torsional_ids in interresidue.keys():
+                p_id,deltas = interresidue[torsional_ids]
+                patch = self.patches[p_id]
+                n = len(patch[0][1])
+                preferred_angles = np.random.randint(n, size=torsionals.shape[0])
+                for p,t_id in zip(patch, map(int, torsional_ids.split('-'))):
+                    e = self.energy_lookup[mol_id][t_id]
+                    angles = []
+                    torsional = []
+                    for p_angle in preferred_angles:
+                        t1 = self.get_uniform(self.energy[e], p[1][p_angle][0])
+                        t2 = self.get_uniform(self.energy[e], p[1][p_angle][1])
+                        torsional.append(np.random.uniform(t1, t2))
+                    
+                    torsionals[:, t_id] = torsional
+            mol_id += 1
+
     def _build_individue(self, individue):
         i = 0
         #set torsional angles
         mol_id = 0
         for molecule in self.molecules:
             n = len(molecule.torsionals)
-            torsionals = individue[i:i+n]
-            thetas = []
-            t_id = 0
-            for t in torsionals:
-                e = self.energy_lookup[mol_id][t_id]
-                thetas.append(self.energy[e](t))
-                #thetas.append(t*360)
-                t_id += 1
-            molecule.set_torsional_angles(molecule.torsionals, thetas)
+            if self.sample[mol_id]:
+                torsionals = individue[i:i+n]
+                thetas = []
+                t_id = 0
+                for t in torsionals:
+                    e = self.energy_lookup[mol_id][t_id]
+                    thetas.append(self.energy[e](t))
+                    #thetas.append(t*360)
+                    t_id += 1
+                molecule.set_torsional_angles(molecule.torsionals, thetas)
             mol_id += 1
             i += n
 
@@ -2594,9 +2776,10 @@ class Sampler():
             mol_id = 0
             energy = 0
             t_energy.append(time.time())
+            self.nbr_clashes =  np.zeros(len(self.molecules))
             for molecule in self.molecules:
                 if clash:
-                    energy += self.count_total_clashes(mol_id)
+                    energy += self.count_total_clashes(mol_id, increment = True)
                 else:
                     energy += np.sum(self.compute_total_energy(mol_id, fast = fast))
                 mol_id += 1
@@ -2608,6 +2791,32 @@ class Sampler():
         print "Best energy: ", '%e' % energies[ee[0]], "|| Worst energy: ", '%e' % energies[ee[-1]]
         return ee
 
+    def _immortalize_fittest(self, threshold = 0.01):
+        total_clashes = np.sum(self.nbr_clashes)
+        highlanders = (self.nbr_clashes / total_clashes) < threshold
+        fittest =  self.population[0, :]
+        i = 0
+        mol_id = 0
+        for molecule in self.molecules:
+            n = len(molecule.torsionals)
+            #immortalize new fit
+            if highlanders[mol_id] and self.sample[mol_id]:
+                self.sample[mol_id] = False 
+                self.genes[mol_id] = fittest[i:i+n]
+                thetas = []
+                t_id = 0
+                for t in self.genes[mol_id]:
+                    e = self.energy_lookup[mol_id][t_id]
+                    thetas.append(self.energy[e](t))
+                    t_id += 1
+                molecule.set_torsional_angles(molecule.torsionals, thetas)
+            #kill previous unfit immortal
+            elif not self.sample[mol_id] and not highlanders[mol_id]:
+                fittest[i:i+n] = self.genes[mol_id]
+                self.genes[mol_id] = None
+                self.sample[mol_id] = True
+            mol_id += 1
+            i += n
 
     def _select_fit(self, sorted_population, nbr_survivors = .3, lucky_few=.2):
         n = int(len(sorted_population)*nbr_survivors)
@@ -2651,7 +2860,7 @@ class Sampler():
         i1 = np.random.randint(n)
         i2 = np.random.randint(n)
         i1,i2 =  np.sort([i1, i2])
-        if random.random() < .3:
+        if random.random() < .5:
             offsprings[0, 0:i1] = mate1[0:i1]
             offsprings[0, i1:i2] = mate2[i1:i2]
             offsprings[0, i2:] = mate1[i2:]
@@ -2672,10 +2881,13 @@ class Sampler():
             idx = np.argwhere(np.random.rand(len(offspring)) < mutation_rate)
             offspring[idx] = np.random.rand(len(idx))
 
-    def remove_clashes_GA(self, n_generation = 40, pop_size=30, mutation_rate=0.06, crossover_rate=0.9):
+    def remove_clashes_GA(self, n_generation = 100, pop_size=40, mutation_rate=0.02, crossover_rate=0.9):
         torsionals,n_torsionals = self._get_all_torsional_angles()
         length = len(torsionals)
         self.population = np.random.rand(pop_size, length)
+        self._eugenics()
+        #set input structure to first structure
+        self.population[0, :] = self._build_individue_from_angles()
         i = 0
         fast =  False 
         clash = True
@@ -2689,15 +2901,23 @@ class Sampler():
             t1 = time.time()
             mates = self._select_fit(sorted_population)
             t2 = time.time()
+            if i and not i%10 and False:
+                clash = not clash
+                if clash:
+                    pop_size = int(pop_size*3)
+                    self.population =  np.zeros([pop_size, length])
+                else:
+                    pop_size = pop_size/3
+                    self.population =  np.zeros([pop_size, length])
 
-            if i == n_generation/3:
+            if False and i == n_generation/2:
                 print "Evaluating self energy and reducing the size of the population"
                 clash = False
                 fast =  True
                 pop_size = pop_size/3
                 mutation_rate = 0.01
                 self.population =  np.zeros([pop_size, length])
-            elif i == 3*n_generation/4:
+            elif False and i == 3*n_generation/4:
                 print "Evaluation full energy"
                 fast =  False
 
@@ -2708,6 +2928,8 @@ class Sampler():
             print "New population time: ", t2-t1
             i += 1 
             print "="*70
+        #    if i > n_generation/10:
+        #        self._immortalize_fittest()
         sorted_population = self._evaluate_population(clash = clash, fast = fast)
         self._build_individue(self.population[sorted_population[0]])
         

@@ -1,28 +1,23 @@
-!DIHE: first 4 atoms form the dihedral the follwing atoms are the intra residue atoms
+!DIHE: first 4 atoms form the dihedral followed by prefered angle intervals
 
 PRES 12aa
-RES MAN MAN
-DIHE 1C1  1C2  1O2  2C1
-DIHE 1C2  1O2  2C1  2O5
+DIHE 1C1  1C2  1O2  2C1 45 120   !psi
+DIHE 1C2  1O2  2C1  2O5 -45 -180 !phi
 
 
 
 PRES 16ab
-RES MAN MAN
-DIHE 1O5  1C5  1C6  1O6  1O6
-DIHE 1C5  1C6  1O6  2C1
-DIHE 1C6  1O6  2C1  2O5
+DIHE 1O5  1C5  1C6  1O6  45 90 45  90   45  90  45  90  45  90   45   90   45  90   45   90   45  90!omega
+DIHE 1C5  1C6  1O6  2C1  45 90 45  90   45  90  135 180 135 180  135  180 -90 -180 -90  -180 -90 -180!psi
+DIHE 1C6  1O6  2C1  2O5  45 90 135 180 -90 -180 45  90  135 180 -90  -180  45  90   135  180 -90 -180!phi
 
 
 PRES 13ab
-RES MAN MAN
-DIHE 1C2  1C3  1O3  2C1
-DIHE 1C3  1O3  2C1  2O5
+DIHE 1C2  1C3  1O3  2C1  45  120 45 120 !psi
+DIHE 1C3  1O3  2C1  2O5 -45 -180 80 110 !phi
 
 
 PRES 14bb
-RES NAG NAG
-RES NAG MAN
-DIHE 1C3  1C4  1O4  2C1
-DIHE 1C4  1O4  2C1  2O5
+DIHE 1C3  1C4  1O4  2C1 -45 -120 -45 -90 !psi
+DIHE 1C4  1O4  2C1  2O5  45  120 -45 -90 !phi
 

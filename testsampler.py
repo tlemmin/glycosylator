@@ -20,14 +20,12 @@ myMan9.set_AtomGroup(man9, rootAtom=myMan9.rootAtom, bonds=bonds9)
 myGlycosylator.assign_patches(myMan9)
 #Identify glycan
 print "Identified glycan: ", myGlycosylator.identify_glycan(myMan9)
-exit()
 #Rotate man9
 myMan9.define_torsionals()
 
 atom_type = myGlycosylator.assign_atom_type(myMan9)
 myMan9.set_atom_type(atom_type)
 myMan9.define_torsionals(hydrogens=False)
-exit()
 #N-glycosylate
 HIV = parsePDB('support/examples/4tvp.pdb')
 ASN = HIV.select('resid 625 and chain B')

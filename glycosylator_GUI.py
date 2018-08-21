@@ -336,6 +336,7 @@ class GlycosylatorGUI(tk.Tk):
         #Clear previous variable
         self.linked_glycans = {}
         self.linked_glycanMolecules = {}
+        self.sequon_colors = {}
         #Load new glycoprotein and extract glycans
         self.myGlycosylator.load_glycoprotein(filename)
         self.original_glycanMolecules = self.myGlycosylator.glycanMolecules.copy()
@@ -914,7 +915,7 @@ class GlycosylatorGUI(tk.Tk):
         glycan,bonds = self.myGlycosylator.glycosylate('SELECTED', 
                                                         template_glycan_tree = connect_tree, 
                                                         template_glycan = original_glycan,
-                                                        link_residue=residue, link_patch = 'NGLB', segname=segname)
+                                                        link_residue=residue, link_patch = 'NGLB', chain =  'G', segname=segname)
         new_glycan = glc.Molecule(key)
         new_glycan.set_AtomGroup(glycan, bonds = bonds)
         self.myGlycosylator.assign_patches(new_glycan)
