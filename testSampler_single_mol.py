@@ -32,7 +32,8 @@ vwd_parameters = myGlycosylator.builder.Parameters.parameters['NONBONDED']
 
 mySampler = GL.Sampler([myMan9], None, dihe_parameters, vwd_parameters)
 #torsionals = mySampler.get_all_torsional_angles()
-mySampler.remove_clashes_GA()
+mySampler.remove_clashes_GA(n_generation = 20, pop_size=30, mutation_rate=0.01)
+#mySampler.remove_clashes_GA()
 #writePDB('Man9_GA.pdb', myMan9.atom_group)
 
 #myGlycosylator.write_glycoprotein('HIV_test.pdb')

@@ -123,6 +123,30 @@ def rotation_matrix(axis, theta):
                      [2*(bc-ad), aa+cc-bb-dd, 2*(cd+ab)],
                      [2*(bd+ac), 2*(cd-ab), aa+dd-bb-cc]])
 
+def rotation_matrix2(angle, direction, point=None):
+    """Return matrix to rotate about axis defined by point and direction.
+
+    """
+    sina = math.sin(angle)
+    cosa = math.cos(angle)
+    direction = np.array(direction[:3])
+    direction = direction/math.sqrt(np.dot(direction, direction))
+    # rotation matrix around unit vector
+    R = np.diag([cosa, cosa, cosa])
+    R += np.outer(direction, direction) * (1.0 - cosa)
+    direction *= sina
+    R += np.array([[ 0.0,         -direction[2],  direction[1]],
+                   [ direction[2], 0.0,          -direction[0]],
+                   [-direction[1], direction[0],  0.0]])
+    M = np.identity(4)
+    M[:3, :3] = R
+    if point is not None:
+        # rotation not around origin
+        point = np.array(point[:3], dtype=np.float64, copy=False)
+        M[:3, 3] = point - np.dot(R, point)
+    return M
+
+
     
 def alphanum_sort(l):
     """Alphanumerical sort of a list from
@@ -490,8 +514,8 @@ class Molecule:
         self.rootAtom = rootAtom
         if len(chain) == 1 and len(segn) == 1:
             self.atom_group = PDBmolecule
-            self.chain = chain
-            self.segn = segn
+            self.chain = chain.pop()
+            self.segn = segn.pop()
             a1 = self.atom_group.select('serial ' + str(self.rootAtom))
             segn = a1.getSegnames()
             chid = a1.getChids()
@@ -950,28 +974,18 @@ class Molecule:
             else:
                 atoms.append(str(n))
         sel = self.atom_group.select('serial ' + ' '.join(atoms))
-        axis_sel = self.atom_group.select('serial ' + ' '.join(map(str, torsional[1:-1])))
-        v1,v2 = axis_sel.getCoords()
+        t = torsional[1:-1]
+        v1,v2 = self.atom_group.select('serial ' + ' '.join(map(str, t))).getCoords()[np.argsort(t), :]
         axis = v2-v1
         c_angle = 0.
         if absolute:
-            vec_sel = self.atom_group.select('serial ' + ' '.join(map(str, torsional)))
-            c0,c1,c2,c3 = vec_sel.getCoords()
-            b0 = -1.0*(c1 - c0)
-            b1 = c2 - c1
-            b2 = c3 - c2
+            c_angle = self.measure_dihedral_angle(torsional) 
+            theta =  theta - c_angle
 
-            b1 /= np.linalg.norm(b1)
-            v = b0 - np.dot(b0, b1)*b1
-            w = b2 - np.dot(b2, b1)*b1
-            x = np.dot(v, w)
-            y = np.dot(np.cross(b1, v), w)
-            c_angle = np.degrees(np.arctan2(y, x))
-            theta = theta - c_angle
-        coords = sel.getCoords() - v2
-        M = rotation_matrix(axis, np.deg2rad(theta))
+        coords = sel.getCoords()
+        M = rotation_matrix(axis, np.radians(theta))
         coords = M.dot(coords.transpose())
-        sel.setCoords(coords.transpose()+v2)
+        sel.setCoords(coords.transpose() + v2 - np.dot(M,v2))
         return c_angle
 
     def get_all_torsional_angles(self):
@@ -981,35 +995,42 @@ class Molecule:
         """
         angles = []
         for torsional in self.torsionals:
-            vec_sel = self.atom_group.select('serial ' + ' '.join(map(str, torsional)))
-            c0,c1,c2,c3 = vec_sel.getCoords()
-            b0 = -1.0*(c1 - c0)
-            b1 = c2 - c1
-            b2 = c3 - c2
-
-            b1 /= np.linalg.norm(b1)
-            v = b0 - np.dot(b0, b1)*b1
-            w = b2 - np.dot(b2, b1)*b1
-            x = np.dot(v, w)
-            y = np.dot(np.cross(b1, v), w)
-            angle = np.degrees(np.arctan2(y, x))
+            angle = self.measure_dihedral_angle(torsional)
             angles.append(angle)
-
+        
         return angles
 
     def measure_dihedral_angle(self, torsional):
+        """Calculates dihedral angle for 4 atoms.
+        Parameters:
+            torsional: list of atom serial numbers
+        Returns:
+            angle: dihedral angle in degrees
+        """
+        idx = np.argsort(torsional)
         vec_sel = self.atom_group.select('serial ' + ' '.join(map(str, torsional)))
-        c0,c1,c2,c3 = vec_sel.getCoords()
-        b0 = -1.0*(c1 - c0)
-        b1 = c2 - c1
-        b2 = c3 - c2
+        c0,c1,c2,c3 = vec_sel.getCoords()[idx, :]
+        
+        q1 = c1 - c0
+        q2 = c2 - c1
+        q3 = c3 - c2
 
-        b1 /= np.linalg.norm(b1)
-        v = b0 - np.dot(b0, b1)*b1
-        w = b2 - np.dot(b2, b1)*b1
-        x = np.dot(v, w)
-        y = np.dot(np.cross(b1, v), w)
-        return np.degrees(np.arctan2(y, x))
+        q1xq2 = np.cross(q1,q2)
+        q2xq3 = np.cross(q2,q3)
+        
+        n1 = q1xq2/np.sqrt(np.dot(q1xq2,q1xq2))
+        n2 = q2xq3/np.sqrt(np.dot(q2xq3,q2xq3))
+
+        u1 = n2
+        u3 = q2/(np.sqrt(np.dot(q2,q2)))
+        u2 = np.cross(u3,u1)
+
+        cos_theta = np.dot(n1,u1)
+        sin_theta = np.dot(n1,u2)
+        angle = np.degrees(-np.arctan2(sin_theta,cos_theta))
+        
+        return angle
+
 
     def get_interresidue_torsionals(self, patches):
         connectivity_patches = self.get_patches()
@@ -2003,7 +2024,6 @@ class Glycosylator:
                 else:
                     resid = resids.sort()[-1] + 1
                     resids.append(resid)
-                
                 if sel_residue.getResnames()[0] == glycan_topo[unit]:
                     built_glycan[unit] = ','.join([segname, chain, str(resid),])
                     #built_glycan[unit] = inv_template_glycan_tree[unit]
@@ -2684,6 +2704,10 @@ class Sampler():
         return energy 
 
     def compute_TotalEnergy(self, torsionals):
+        """Compute the total energy of a molecule; Torsional + Non-bonded
+        Parameters:
+            torsionals: list of all torsional angles
+        """
         counter = 0
         mol_id = 0
         energy = 0
@@ -2698,6 +2722,8 @@ class Sampler():
     
 
     def _get_all_torsional_angles(self):
+        """Measures and returns all the torsional angle in molecules
+        """
         angles = []
         n_torsionals = []
         for molecule in self.molecules:
@@ -2707,6 +2733,8 @@ class Sampler():
         return angles,n_torsionals
 
     def _build_individue_from_angles(self):
+        """Generate an individue for GA based on the torsional angles present in molecules
+        """
         i = 0
         #set torsional angles
         mol_id = 0
@@ -2722,9 +2750,15 @@ class Sampler():
             mol_id += 1
         return individue
 
-    def _eugenics(self):
+    def _eugenics(self, percentage_of_population = .75):
+        """Uses a set of predefined angles to bias the sampled torsional angles. torsional angles defined in pres.top will be biased
+        Parameters:
+            percentage_of_population: percent of the total population that should be biased
+        """
         i = 0
         mol_id = 0
+        
+        size = int(self.population.shape[0] * percentage_of_population)
         for molecule, interresidue in zip(self.molecules, self.interresidue_torsionals):
             n = len(molecule.torsionals)
             torsionals = self.population[:, i:i+n]
@@ -2732,7 +2766,7 @@ class Sampler():
                 p_id,deltas = interresidue[torsional_ids]
                 patch = self.patches[p_id]
                 n = len(patch[0][1])
-                preferred_angles = np.random.randint(n, size=torsionals.shape[0])
+                preferred_angles = np.random.randint(n, size = size)
                 for p,t_id in zip(patch, map(int, torsional_ids.split('-'))):
                     e = self.energy_lookup[mol_id][t_id]
                     angles = []
@@ -2742,10 +2776,14 @@ class Sampler():
                         t2 = self.get_uniform(self.energy[e], p[1][p_angle][1])
                         torsional.append(np.random.uniform(t1, t2))
                     
-                    torsionals[:, t_id] = torsional
+                    torsionals[:size, t_id] = torsional
             mol_id += 1
 
     def _build_individue(self, individue):
+        """Builds and sets torsionals angles of molecules, based on a individue
+        Parameter:
+            individue: list of corresponding to one individue in population
+        """
         i = 0
         #set torsional angles
         mol_id = 0
@@ -2760,11 +2798,16 @@ class Sampler():
                     thetas.append(self.energy[e](t))
                     #thetas.append(t*360)
                     t_id += 1
-                molecule.set_torsional_angles(molecule.torsionals, thetas)
+                molecule.set_torsional_angles(molecule.torsionals, thetas, absolute = True)
             mol_id += 1
             i += n
 
     def _evaluate_population(self, clash = False, fast = False):
+        """Evaluates the fittnest of a population:
+        Parameters:
+            clash: boolean defing if the nonbonded energy(default) or clashes should be computed
+            fast: boolean defining if the fast (and inacurate) implementation of clash/energy algorithms should be considered
+        """
         energies = []
         t_build = []
         t_energy = []
@@ -2783,15 +2826,20 @@ class Sampler():
                 else:
                     energy += np.sum(self.compute_total_energy(mol_id, fast = fast))
                 mol_id += 1
+            ttt = self._get_all_torsional_angles()
             energies.append(energy)
             t_energy.append(time.time())
         print "Average build time: ", np.mean(np.diff(t_build))
         print "Average evaluation time: ", np.mean(np.diff(t_energy))
         ee = np.argsort(energies)
-        print "Best energy: ", '%e' % energies[ee[0]], "|| Worst energy: ", '%e' % energies[ee[-1]]
+        print "Best energy: ", '%e' % energies[ee[0]], "|| Median energy: ", '%e' % np.median(energies), "|| Worst energy: ", '%e' % energies[ee[-1]]
         return ee
 
     def _immortalize_fittest(self, threshold = 0.01):
+        """Immortalizes individue with clashes/energy contributing to less than threshold (fraction) of the total energy/clashes
+        Parameters:
+            threshold: defines which individue should be immortalized
+        """
         total_clashes = np.sum(self.nbr_clashes)
         highlanders = (self.nbr_clashes / total_clashes) < threshold
         fittest =  self.population[0, :]
@@ -2810,7 +2858,7 @@ class Sampler():
                     thetas.append(self.energy[e](t))
                     t_id += 1
                 molecule.set_torsional_angles(molecule.torsionals, thetas)
-            #kill previous unfit immortal
+            #Make unfit immortal perishable
             elif not self.sample[mol_id] and not highlanders[mol_id]:
                 fittest[i:i+n] = self.genes[mol_id]
                 self.genes[mol_id] = None
@@ -2819,6 +2867,12 @@ class Sampler():
             i += n
 
     def _select_fit(self, sorted_population, nbr_survivors = .3, lucky_few=.2):
+        """Selection of the fittest individue for mating
+        Parameters:
+            sorted_population: sorted indices of population fitness
+            nbr_survivors: number of surviving individues
+            luck_few: fraction of less fit individue that survive
+        """
         n = int(len(sorted_population)*nbr_survivors)
         mates =  np.empty([n, self.population.shape[1]])
         fittest = int(n*(1-lucky_few))
@@ -2827,7 +2881,11 @@ class Sampler():
         return mates
 
     def _create_new_population(self, mates, pop_size, mutation_rate, crossover_rate):
-        #keep best two
+        """Generates a new populations based on a list of mates
+        Parameters:
+
+        """
+        #keep best 
         self.population[0, :] = mates[0, :]
         i = 1 
         while i < pop_size:
@@ -2846,7 +2904,7 @@ class Sampler():
                 if i >= pop_size:
                     break
 
-    def _tournament(self, mates, size = 4, choose_best = 0.9):
+    def _tournament(self, mates, size = 5, choose_best = 0.9):
         competitors = np.random.randint(mates.shape[0], size=size)
         competitors = np.sort(competitors)
         if random.random() < choose_best:
@@ -2857,10 +2915,8 @@ class Sampler():
     def _crossover(self, mate1, mate2):
         n = len(mate1)
         offsprings = np.empty([2, n])
-        i1 = np.random.randint(n)
-        i2 = np.random.randint(n)
-        i1,i2 =  np.sort([i1, i2])
-        if random.random() < .5:
+        i1,i2 = np.sort(np.random.randint(n, size=2))
+        if random.random() < .75:
             offsprings[0, 0:i1] = mate1[0:i1]
             offsprings[0, i1:i2] = mate2[i1:i2]
             offsprings[0, i2:] = mate1[i2:]
@@ -2881,7 +2937,7 @@ class Sampler():
             idx = np.argwhere(np.random.rand(len(offspring)) < mutation_rate)
             offspring[idx] = np.random.rand(len(idx))
 
-    def remove_clashes_GA(self, n_generation = 100, pop_size=40, mutation_rate=0.02, crossover_rate=0.9):
+    def remove_clashes_GA(self, n_generation = 50, pop_size=40, mutation_rate=0.01, crossover_rate=0.9):
         torsionals,n_torsionals = self._get_all_torsional_angles()
         length = len(torsionals)
         self.population = np.random.rand(pop_size, length)
@@ -2890,7 +2946,7 @@ class Sampler():
         self.population[0, :] = self._build_individue_from_angles()
         i = 0
         fast =  False 
-        clash = True
+        clash = True 
         while i < n_generation:
             print "Generation:", i 
             t1 = time.time()
@@ -2928,8 +2984,8 @@ class Sampler():
             print "New population time: ", t2-t1
             i += 1 
             print "="*70
-        #    if i > n_generation/10:
-        #        self._immortalize_fittest()
+#            if i > n_generation/3:
+#                self._immortalize_fittest()
         sorted_population = self._evaluate_population(clash = clash, fast = fast)
         self._build_individue(self.population[sorted_population[0]])
         
