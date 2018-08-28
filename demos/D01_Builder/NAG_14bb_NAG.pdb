@@ -1,0 +1,58 @@
+REMARK AtomGroup NAG1 Selection 'not (segment G1... 2 and name O1)' + NAG2 Selection 'not (segment G1... 2 and name O1)'
+HETATM    1  C1  NAG G   1       0.185   1.082  -0.421  0.00  0.00        G1  
+HETATM    2  H1  NAG G   1       0.133   1.040  -1.509  0.00  0.00        G1  
+HETATM    3  O1  NAG G   1       1.003   2.185  -0.024  0.00  0.00        G1  
+HETATM    4  HO1 NAG G   1       0.679   3.044  -0.328  0.00  0.00        G1  
+HETATM    5  C5  NAG G   1      -2.042   0.207  -0.246  0.00  0.00        G1  
+HETATM    6  H5  NAG G   1      -2.123   0.154  -1.332  0.00  0.00        G1  
+HETATM    7  O5  NAG G   1      -1.130   1.248   0.113  0.00  0.00        G1  
+HETATM    8  C2  NAG G   1       0.790  -0.220   0.112  0.00  0.00        G1  
+HETATM    9  H2  NAG G   1       0.879  -0.163   1.197  0.00  0.00        G1  
+HETATM   10  N2  NAG G   1       2.114  -0.422  -0.480  0.00  0.00        G1  
+HETATM   11  HN2 NAG G   1       2.212  -0.973  -1.273  0.00  0.00        G1  
+HETATM   12  C7  NAG G   1       3.197   0.157   0.076  0.00  0.00        G1  
+HETATM   13  O7  NAG G   1       3.074   0.845   1.067  0.00  0.00        G1  
+HETATM   14  C8  NAG G   1       4.559  -0.052  -0.533  0.00  0.00        G1  
+HETATM   15  H81 NAG G   1       4.560   0.320  -1.558  0.00  0.00        G1  
+HETATM   16  H82 NAG G   1       5.305   0.490   0.050  0.00  0.00        G1  
+HETATM   17  H83 NAG G   1       4.799  -1.115  -0.532  0.00  0.00        G1  
+HETATM   18  C3  NAG G   1      -0.124  -1.390  -0.265  0.00  0.00        G1  
+HETATM   19  H3  NAG G   1      -0.174  -1.478  -1.350  0.00  0.00        G1  
+HETATM   20  O3  NAG G   1       0.395  -2.600   0.291  0.00  0.00        G1  
+HETATM   21  HO3 NAG G   1      -0.135  -3.384   0.091  0.00  0.00        G1  
+HETATM   22  C4  NAG G   1      -1.526  -1.129   0.294  0.00  0.00        G1  
+HETATM   23  H4  NAG G   1      -1.483  -1.091   1.382  0.00  0.00        G1  
+HETATM   24  O4  NAG G   1      -2.405  -2.180  -0.114  0.00  0.00        G1  
+HETATM   25  C6  NAG G   1      -3.417   0.504   0.355  0.00  0.00        G1  
+HETATM   26  H61 NAG G   1      -4.088  -0.333   0.157  0.00  0.00        G1  
+HETATM   27  H62 NAG G   1      -3.320   0.645   1.431  0.00  0.00        G1  
+HETATM   28  O6  NAG G   1      -3.949   1.691  -0.236  0.00  0.00        G1  
+HETATM   29  HO6 NAG G   1      -4.822   1.940   0.099  0.00  0.00        G1  
+HETATM   30  C1  NAG G   2      -2.443  -3.388   0.572  1.00  0.00        G1 C
+HETATM   31  H1  NAG G   2      -1.642  -3.454   1.299  1.00  0.00        G1 H
+HETATM   32  C5  NAG G   2      -2.303  -5.770   0.202  1.00  0.00        G1 C
+HETATM   33  H5  NAG G   2      -1.444  -5.836   0.871  1.00  0.00        G1 H
+HETATM   34  O5  NAG G   2      -2.348  -4.468  -0.387  1.00  0.00        G1 O
+HETATM   35  C2  NAG G   2      -3.726  -3.506   1.401  1.00  0.00        G1 C
+HETATM   36  H2  NAG G   2      -4.592  -3.424   0.744  1.00  0.00        G1 H
+HETATM   37  N2  NAG G   2      -3.763  -2.438   2.396  1.00  0.00        G1 N
+HETATM   38  HN2 NAG G   2      -3.442  -2.603   3.296  1.00  0.00        G1 H
+HETATM   39  C7  NAG G   2      -4.243  -1.221   2.064  1.00  0.00        G1 C
+HETATM   40  O7  NAG G   2      -4.643  -1.015   0.940  1.00  0.00        G1 O
+HETATM   41  C8  NAG G   2      -4.282  -0.117   3.094  1.00  0.00        G1 C
+HETATM   42  H81 NAG G   2      -3.271   0.087   3.446  1.00  0.00        G1 H
+HETATM   43  H82 NAG G   2      -4.698   0.784   2.645  1.00  0.00        G1 H
+HETATM   44  H83 NAG G   2      -4.904  -0.425   3.934  1.00  0.00        G1 H
+HETATM   45  C3  NAG G   2      -3.746  -4.863   2.105  1.00  0.00        G1 C
+HETATM   46  H3  NAG G   2      -2.917  -4.919   2.810  1.00  0.00        G1 H
+HETATM   47  O3  NAG G   2      -4.975  -5.012   2.823  1.00  0.00        G1 O
+HETATM   48  HO3 NAG G   2      -5.056  -5.854   3.296  1.00  0.00        G1 H
+HETATM   49  C4  NAG G   2      -3.588  -6.014   0.995  1.00  0.00        G1 C
+HETATM   50  H4  NAG G   2      -4.444  -5.987   0.321  1.00  0.00        G1 H
+HETATM   51  O4  NAG G   2      -3.531  -7.291   1.637  1.00  0.00        G1 O
+HETATM   52  HO4 NAG G   2      -3.436  -8.036   1.022  1.00  0.00        G1 H
+HETATM   53  C6  NAG G   2      -2.174  -6.824  -0.900  1.00  0.00        G1 C
+HETATM   54  H61 NAG G   2      -2.230  -7.819  -0.458  1.00  0.00        G1 H
+HETATM   55  H62 NAG G   2      -2.985  -6.699  -1.617  1.00  0.00        G1 H
+HETATM   56  O6  NAG G   2      -0.918  -6.667  -1.565  1.00  0.00        G1 O
+HETATM   57  HO6 NAG G   2      -0.768  -7.306  -2.280  1.00  0.00        G1 H

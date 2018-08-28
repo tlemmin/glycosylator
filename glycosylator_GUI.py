@@ -65,7 +65,7 @@ class GlycosylatorGUI(tk.Tk):
         
         #database variables
         self.user_glycans = {} 
-        self.db_commong = SELF_BIN + '/test_db.db'
+        self.db_commong = os.path.join(SELF_BIN,  'support/topology/mannose.db')
         self.common_glycans = {}
         
         #database window
@@ -448,10 +448,14 @@ class GlycosylatorGUI(tk.Tk):
                                                   tags="self.frame_commong")
 #        self.populate(self.frame_commong)
         if not self.common_glycans:
+            self.hide_database()
+            self.popup_progress_bar('Importing library...')
             self.common_glycans = self.import_glycans(self.db_commong)
             self.common_images = []
             self.common_canvas = []
             self.display_db(self.frame_commong, self.common_glycans, self.common_images, self.common_canvas)
+            self.popup.destroy()
+            self.show_database()
         self.frame_commong.bind("<Configure>", self._on_frame_configure)
         
         #user glycans tab
@@ -626,7 +630,6 @@ class GlycosylatorGUI(tk.Tk):
             self.user_canvas = []
             self.user_names = []
             self.display_db(self.frame_userg, self.user_glycans, self.user_images, self.user_canvas)
-        
 
     def import_glycans(self, filename):
         """Import connectivity topology from sql database
@@ -844,12 +847,12 @@ class GlycosylatorGUI(tk.Tk):
         unit_list = []
         n_unit = 0
         for unit in units:
-            unit = filter(None, unit.split(' '))
+            unit = filter(None, unit)
             n_unit +=1
-            if len(unit) > 1:
-                unit_list.append([unit[0], 'C1', unit[1:]])
+            if len(unit) > 2:
+                unit_list.append([unit[0], 'C1', unit[2]])
             else:
-                unit_list.append([unit[0], '', []])
+                unit_list.append([unit[0], '', ['']])
         connect_topology['UNIT'] = unit_list
         connect_topology['#UNIT'] = n_unit
         return connect_topology
@@ -908,7 +911,6 @@ class GlycosylatorGUI(tk.Tk):
             r,t = self.original_glycans[key]
             connect_tree = self.myGlycosylator.build_connectivity_tree(r, t)
             self.myGlycosylator.connect_topology['SELECTED'] = self.myGlycosylator.build_connect_topology(original_glycan) 
-#            self.myGlycosylator.connect_topology['SELECTED'] = self.connect_tree_to_topology(self.myGlycosylator.build_connect_topology(original_glycan)) 
             original_glycan = original_glycan.atom_group
         
         segname = 'G'+key.split(',')[2]
@@ -963,6 +965,14 @@ class GlycosylatorGUI(tk.Tk):
             with open(filename, 'w') as f:
                 f.write('\n'.join(patches))
 
+    def popup_progress_bar(self, text):
+        self.popup = tk.Toplevel(self)
+        tk.Label(self.popup, text=text).grid(row = 0, column = 0)
+        progress_bar = ttk.Progressbar(self.popup,mode='indeterminate')
+        progress_bar.grid(row=1, column=0)
+        progress_bar.start(1)
+        self.popup.update()
+        self.popup.deiconify()
 
 
 if __name__ == "__main__":

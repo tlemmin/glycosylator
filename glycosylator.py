@@ -47,7 +47,8 @@ import time
 
 
 
-SELF_BIN = os.path.dirname(os.path.realpath(sys.argv[0]))
+GLYCOSYLATOR_PATH = os.path.dirname(os.path.realpath(__file__))
+#SELF_BIN = os.path.dirname(os.path.realpath(sys.argv[0]))
 #sys.path.insert(0, SELF_BIN + '/support')
 
 
@@ -667,8 +668,8 @@ class Molecule:
         for b1,b2 in bonds:
             if b1 in inv_atom and b2 in inv_atom:
                 newbonds.append((inv_atom[b1], inv_atom[b2]))
-            else:
-                print 'Skipping bond', b1,b2
+            #else:
+                #print 'Skipping bond', b1,b2
         self.connectivity = nx.Graph()
         self.connectivity.add_edges_from(newbonds)
         self.bonds = self.connectivity.edges()
@@ -702,6 +703,9 @@ class Molecule:
             self.chain = chain.pop()
             self.segn = segn.pop()
             a1 = self.atom_group.select('serial ' + str(self.rootAtom))
+            if not a1:
+                self.rootAtom = self.atom_group.getSerials()[0]
+                a1 = self.atom_group.select('serial ' + str(self.rootAtom))
             segn = a1.getSegnames()
             chid = a1.getChids()
             res =  a1.getResnums()
@@ -744,7 +748,7 @@ class Molecule:
         self.connectivity.add_edges_from(np.array(newbonds) + natoms)
         #self.connectivity.remove_edges_from(delete_bonds)
         self.bonds = self.connectivity.edges()
-        self.update_connectivity(self, update_bonds = False)
+        self.update_connectivity(update_bonds = False)
 
     def delete_atoms(self, dele_atoms):
         """ removes atoms and bonds from molecule
@@ -766,7 +770,7 @@ class Molecule:
         self.atom_group.setSerial(np.arange(self.atom_group.numAtoms()))
         self.atom_group.setTitle(self.name)
         self.bonds = newbonds
-        self.update_connectivity(self, update_bonds = False)    
+        self.update_connectivity(update_bonds = False)    
 
     def guess_bonds(self, default_bond_length = 1.6):
         """Searches for all bonds in molecule
@@ -1007,6 +1011,13 @@ class Molecule:
         Returns:
             angle: dihedral angle in degrees
         """
+        if type(torsional) == int:
+            torsional = self.torsionals[torsional]
+        else:
+            if torsional not in self.torsionals:
+                print "Unknown torsional"
+                return -1
+
         idx = np.argsort(torsional)
         vec_sel = self.atom_group.select('serial ' + ' '.join(map(str, torsional)))
         c0,c1,c2,c3 = vec_sel.getCoords()[idx, :]
@@ -2019,11 +2030,11 @@ class Glycosylator:
                 sel = ' and '.join(sel)
                 sel_residue = template_glycan.select(sel)
                 resid =  sel_residue.getResnums()[0]
-                if resid not in resids:
-                    resids.append(resid)
-                else:
-                    resid = resids.sort()[-1] + 1
-                    resids.append(resid)
+                
+                if resid in resids:
+                    resid = sorted(resids)[-1] + 1
+
+                resids.append(resid)
                 if sel_residue.getResnames()[0] == glycan_topo[unit]:
                     built_glycan[unit] = ','.join([segname, chain, str(resid),])
                     #built_glycan[unit] = inv_template_glycan_tree[unit]
@@ -2398,7 +2409,7 @@ class Sampler():
         self.exclude1_3 = []
         self.genes = []
         self.sample = []
-        self.parse_patches('support/topology/pres.top')
+        self.parse_patches(os.path.join(GLYCOSYLATOR_PATH,'support/topology/pres.top'))
         self.interresidue_torsionals = []
         mol_id =  0
         for molecule in self.molecules:
