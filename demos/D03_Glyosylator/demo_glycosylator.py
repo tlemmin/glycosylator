@@ -1,29 +1,30 @@
 #!usr/bin/env python 
- 
   
-################################################################################ 
-# A GENERAL EXPLANATION 
-
 """ 
 demo_glycosylator.py
 
 The Glycosylator class is used for modelling glycans
 The following code will illustrate how to manipulate entire glycoprotein
-
+1. The initialization of a Glysosylator instance requires  topology and parameter files
+2. Specific sequon can be modified. For N glycosylation, the NGLB patch is used
+3. All sequons can be automatically detected and the corresponding glycans identified
+4. Glycans linked to sequon can be modified 
+5. The modified glycan can be directly replace the previous glycan in the glycoprotein
 """
 
 import glycosylator as gl
 import prody as pd
 import os
-
-#Create a glycosylator
+################################################################################
+# 1. Create a glycosylator
 myGlycosylator = gl.Glycosylator(os.path.join(gl.GLYCOSYLATOR_PATH, 'support/toppar_charmm/carbohydrates.rtf'), os.path.join(gl.GLYCOSYLATOR_PATH, 'support/toppar_charmm/carbohydrates.prm'))
 myGlycosylator.builder.Topology.read_topology(os.path.join(gl.GLYCOSYLATOR_PATH, 'support/topology/DUMMY.top'))
 #Load topology information about glycans
 myGlycosylator.read_connectivity_topology(os.path.join(gl.GLYCOSYLATOR_PATH, 'support/topology/mannose.top'))
 
 
-#Manually N-glycosylate one sequon
+################################################################################
+# 2. Manually N-glycosylate one sequon
 HIV_Env = pd.parsePDB(os.path.join(gl.GLYCOSYLATOR_PATH, 'support/examples/env_4tvp.pdb'))
 sequon = HIV_Env.select('resid 625 and chain B')
 
@@ -35,7 +36,8 @@ atom_type = myGlycosylator.assign_atom_type(myMan8)
 myMan8.set_atom_type(atom_type)
 myMan8.define_torsionals(hydrogens=False)
 
-#Automatically detect all sequons and N-linked glycans
+################################################################################
+# 3. Automatically detect all sequons and N-linked glycans
 print '#'*50
 print 'Loading glycoprotein'
 myGlycosylator.load_glycoprotein(os.path.join(gl.GLYCOSYLATOR_PATH, 'support/examples/env_4tvp.pdb'))
@@ -46,10 +48,11 @@ print '-'*50
 for sequon,glycan in myGlycosylator.glycanMolecules.items():
     print sequon, '->', myGlycosylator.identify_glycan(glycan) 
 
+################################################################################
+# 4. Modify N-linked glycan at sequon ASN 262
+#key: segn,chid,resid,icode
 print '#'*50
 print 'Modifying sequon N262'
-#Modify N-linked glycan at sequon ASN 262
-#key: segn,chid,resid,icode
 key = ',G,262,'
 #ASN AtomGroup
 sequon = myGlycosylator.get_residue(key)
@@ -67,7 +70,8 @@ glycan,bonds = myGlycosylator.glycosylate('MAN9_3;4,2',
 new_glycan = gl.Molecule(key)
 new_glycan.set_AtomGroup(glycan, bonds = bonds)
 myGlycosylator.assign_patches(new_glycan)
-#Create a dictionary for storing new glycans
+################################################################################
+# 5. Create a dictionary for storing new glycans
 linked_glycanMolecules = {}
 linked_glycanMolecules[key] = new_glycan
 #Update glycan and save pdb

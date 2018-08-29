@@ -10,14 +10,19 @@ demo_sampler.py
 The Sampler class is for sampling conformations of glycans
 The following code illustrates how to optimize all glycans in a glycoprotein
 
+1. Initialize Glycosylator and identify all glycans
+2. Initialize Drawer
+3. For each chain draw protein and linked glycans
 """
 
 import glycosylator as gl
 import prody as pd
 import os
 import matplotlib.pyplot as plt
-import numpy as np
-#Create a glycosylator
+
+
+################################################################################
+# 1. Create a glycosylator
 myGlycosylator = gl.Glycosylator(os.path.join(gl.GLYCOSYLATOR_PATH, 'support/toppar_charmm/carbohydrates.rtf'), os.path.join(gl.GLYCOSYLATOR_PATH, 'support/toppar_charmm/carbohydrates.prm'))
 myGlycosylator.builder.Topology.read_topology(os.path.join(gl.GLYCOSYLATOR_PATH, 'support/topology/DUMMY.top'))
 #Load topology information about glycans
@@ -26,7 +31,10 @@ myGlycosylator.read_connectivity_topology(os.path.join(gl.GLYCOSYLATOR_PATH, 'su
 myGlycosylator.load_glycoprotein(os.path.join(gl.GLYCOSYLATOR_PATH, 'support/examples/env_4tvp.pdb'))
 myGlycosylator.build_glycan_topology(patch = 'NGLB')
 
+################################################################################
+# 2. Initialize Drawer
 myDrawer = gl.Drawer()
+# 3. loop through all chains in glycoprotein
 for chid in  myGlycosylator.sequences.keys():
     l = len(myGlycosylator.sequences[chid])
     sequons = [k for k in myGlycosylator.sequons.keys() if chid in k[:len(chid)]]
