@@ -1013,10 +1013,10 @@ class Molecule:
         """
         if type(torsional) == int:
             torsional = self.torsionals[torsional]
-        else:
-            if torsional not in self.torsionals:
-                print "Unknown torsional"
-                return -1
+#        else:
+#            if torsional not in self.torsionals:
+#                print "Warning Unknown torsional:", torsional
+#                return -1
 
         idx = np.argsort(torsional)
         vec_sel = self.atom_group.select('serial ' + ' '.join(map(str, torsional)))
@@ -1068,20 +1068,18 @@ class Molecule:
                     else:
                         serials.append(inv_ids[r2 + ',' + a[1:]])
                 #search for torsional angle index and measure delta angle
-                idx_t = 0
-                for t in self.torsionals:
+                for i,t in enumerate(self.torsionals):
                     if serials[1] == t[1] and serials[2] == t[2]:
                         delta_angles.append(self.measure_dihedral_angle(t) - self.measure_dihedral_angle(serials))
-                        torsionals_idx.append(idx_t)
+                        torsionals_idx.append(i)
                         break
-                    idx_t += 1
             interresidue_torsionals['-'.join(map(str, torsionals_idx))] = [patch, delta_angles]
         return interresidue_torsionals
 
 
 
 #####################################################################################
-#                                Builders                                            #
+#                                   Builders                                            #
 #####################################################################################
 class MoleculeBuilder:
     """Class for building/modifying molecule
@@ -1848,6 +1846,8 @@ class Glycosylator:
         kd = KDTree(sel.getCoords())
         kd.search(1.7)
         atoms = kd.getIndices()
+        if not atoms:
+            return {}, {}
         G = nx.Graph()
         ids,rn = self.get_ids(sel) 
         for a1,a2 in atoms:
@@ -1897,7 +1897,10 @@ class Glycosylator:
             glycan.interresidue_connectivity = g.copy()
             self.assign_patches(glycan) 
             self.glycanMolecules[k] = glycan
-        self.protein = self.glycoprotein.select('not ((' + ') or ('.join(sel_all) + '))').copy()
+        if sel_all:
+            self.protein = self.glycoprotein.select('not ((' + ') or ('.join(sel_all) + '))').copy()
+        else:
+            self.protein = self.glycoprotein.copy()
      
     def connect_all_glycans(self, G):
         """Builds a connectivity graph for molecules (not protein) in AtomGroup. Edges with unknown patches will be removed
@@ -2813,11 +2816,12 @@ class Sampler():
             mol_id += 1
             i += n
 
-    def _evaluate_population(self, clash = False, fast = False):
+    def _evaluate_population(self, clash = False, fast = False, eval_idx = []):
         """Evaluates the fittnest of a population:
         Parameters:
             clash: boolean defing if the nonbonded energy(default) or clashes should be computed
             fast: boolean defining if the fast (and inacurate) implementation of clash/energy algorithms should be considered
+            eval_idx: only consider subgroup of molecules
         """
         energies = []
         t_build = []
@@ -2945,8 +2949,10 @@ class Sampler():
 
     def _mutate(self, offsprings, mutation_rate):
         for offspring in offsprings:
-            idx = np.argwhere(np.random.rand(len(offspring)) < mutation_rate)
-            offspring[idx] = np.random.rand(len(idx))
+            idx = np.random.rand(len(offspring)) < mutation_rate
+            if idx.any(): 
+                offspring[idx] = np.squeeze(np.random.rand(np.sum(idx)))
+    
 
     def remove_clashes_GA(self, n_generation = 50, pop_size=40, mutation_rate=0.01, crossover_rate=0.9):
         torsionals,n_torsionals = self._get_all_torsional_angles()

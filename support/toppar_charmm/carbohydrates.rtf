@@ -289,8 +289,68 @@ IC O7 C7 C8 H81  1.21 120.05 -119.98 109.48 1.09
 IC O7 C7 C8 H82  1.21 120.05 -0.06 109.47 1.09
 IC O7 C7 C8 H83  1.21 120.05 119.98 109.52 1.09
 
-
 PATCH FIRST NONE LAST NONE
+
+RESI FUC           0.000  ! alpha-L-fucose
+                           !
+GROU                       !
+ATOM C1   CC3162    0.340  !
+ATOM H1   HCA1      0.090  !
+ATOM O1   OC311    -0.650  !                  H5
+ATOM HO1  HCP1      0.420  !                  |
+ATOM C5   CC3163    0.110  !                  C5---O5
+ATOM H5   HCA1      0.090  !            H4   /|      \    O1-HO1
+ATOM O5   OC3C61   -0.400  !              \ / C6  HO2 \  /
+GROU                       !               C4      |   C1
+ATOM C2   CC3161    0.140  !              / \ H3   O2 /  \
+ATOM H2   HCA1      0.090  !        HO4-O4   \|    | /    H1
+ATOM O2   OC311    -0.650  !                  C3---C2
+ATOM HO2  HCP1      0.420  !                  |    |
+GROU                       !              HO3-O3   H2
+ATOM C3   CC3161    0.140  !
+ATOM H3   HCA1      0.090  !        n.b.: H61, H62, and H63 are attached to C6
+ATOM O3   OC311    -0.650  !
+ATOM HO3  HCP1      0.420  !
+GROU
+ATOM C4   CC3161    0.140
+ATOM H4   HCA1      0.090
+ATOM O4   OC311    -0.650
+ATOM HO4  HCP1      0.420
+GROU
+ATOM C6   CC331    -0.270
+ATOM H61  HCA3      0.090
+ATOM H62  HCA3      0.090
+ATOM H63  HCA3      0.090
+!
+BOND C1   O1        C1   H1        O1   HO1       C1   O5        C1   C2
+BOND C2   H2        C2   O2        O2   HO2       C2   C3        C3   H3
+BOND C3   O3        O3   HO3       C3   C4        C4   H4        C4   O4
+BOND O4   HO4       C4   C5        C5   H5        C5   C6        C6   H61
+BOND C6   H62       C6   H63       C5   O5
+
+IC C2 C1 O5 C5  1.53 109.76 67.63 107.65 1.43
+IC C5 O5 C1 C2  1.43 107.65 67.63 109.76 1.53
+IC O5 C1 C2 C3  1.43 109.76 -61.30 108.97 1.53
+IC C1 O5 C5 C4  1.43 107.65 -67.64 109.70 1.53
+IC C5 O5 C1 H1  1.43 107.65 -172.36 109.43 1.09
+IC O2 C2 C1 O1  1.43 109.52 -61.14 109.38 1.43
+IC O5 C1 C2 O2  1.43 109.76 178.78 109.52 1.43
+IC O2 C3 C2 H2  2.42 33.78 120.27 109.59 1.09
+IC C1 C2 C3 O3  1.53 108.97 173.65 109.60 1.43
+IC O3 C4 C3 H3  2.42 33.75 -120.42 109.68 1.09
+IC C2 C3 C4 O4  1.53 108.63 66.22 109.61 1.43
+IC O4 C5 C4 H4  2.42 33.75 -120.17 109.41 1.09
+IC C6 O5 C5 H5  2.41 36.70 -119.91 109.36 1.09
+IC C1 O5 C5 C6  1.43 107.65 172.27 109.43 1.53
+IC C4 C5 C6 H63  1.53 109.45 59.91 109.48 1.09
+IC H63 C5 C6 H62  2.15 28.49 -120.03 109.54 1.09
+IC H63 H62 C6 H61  1.78 35.28 -119.92 109.40 1.09
+IC O5 C1 O1 HO1  1.43 109.44 -60.10 106.79 0.97
+IC C1 C2 O2 HO2  1.53 109.52 -60.02 106.86 0.97
+IC C2 C3 O3 HO3  1.53 109.60 60.00 106.82 0.97
+IC C3 C4 O4 HO4  1.53 109.61 -179.95 106.81 0.97
+
+PATCH FIRST NONE LAST NO
 
 ! axial-axial 1->2 linkage
 ! use for FABYOW axial mannopyranose
@@ -405,5 +465,7 @@ IC   1CG   1ND2 2C1   2O5         1.3126  128.70  -70.91  104.39   1.4413
 IC   1HD22 1ND2 2C1   2O5         1.0117  111.10  108.04  104.39   1.4413
 IC   2C5   2O5  2C1   2H1         1.4242  116.13   41.53  110.40   1.1136
 IC   1ND2  2C1  2O5   2C5         1.3783  104.39  165.66  116.13   1.4242
+
+
 
 
