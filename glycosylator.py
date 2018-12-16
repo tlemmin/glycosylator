@@ -2388,7 +2388,7 @@ class Glycosylator:
 class Sampler():
     """Class to sample conformations, based on a 
     """
-    def __init__(self, molecules, envrionment, dihe_parameters, vdw_parameters, clash_dist = 1.8):
+    def __init__(self, molecules, envrionment, dihe_parameters, vdw_parameters, clash_dist = 1.8, grid_resolution = 1.0):
         """ 
         Parameters
             molecules: list of Molecules instances
@@ -2412,10 +2412,27 @@ class Sampler():
         self.exclude1_3 = []
         self.genes = []
         self.sample = []
+        #size of environment
+        self.grid_resolution = grid_resolution
+        c = self.environment.getCoords()
+        c_min = np.min(c,axis = 0)
+        c_max = np.max(c, axis = 1)
+        c_size = int((c_max - c_min)/self.grid_resolution)
+        self.bins = [np.linspace(c_min[0], c_max[0], c_size[0]), np.linspace(c_min[1], c_max[1], c_size[1]), np.linspace(c_min[2], c_max[2], c_size[2])]
+        self.environment_grid = np.full(c_size, type=False)
+    	x_idx=np.digitize(c[:, 0], self.bins[0])-1
+        y_idx=np.digitize(c[:, 1], self.bins[1])-1
+        z_idx=np.digitize(c[:, 2], self.bins[2])-1
+        self.environment_grid[(z_idx, y_idx, x_idx)] = True
+        
         self.parse_patches(os.path.join(GLYCOSYLATOR_PATH,'support/topology/pres.top'))
         self.interresidue_torsionals = []
-        mol_id =  0
-        for molecule in self.molecules:
+		
+		self.coordinate_idx = np.ones(len(molecules))
+		idx = 0
+        for mol_id,molecule in enumerate(self.molecules):
+        	idx += molecule.atom_group.numAtoms
+        	self.coordinate_idx[mol_id] = idx
             self.sample.append(True)
             self.genes.append(None)
             types = nx.get_node_attributes(molecule.connectivity, 'type')
@@ -2441,7 +2458,7 @@ class Sampler():
             #self.nbr_clashes.append(self.count_total_clashes(mol_id))
             #self.non_bonded_energy.append(self.compute_total_energy(mol_id))
             self.count_total_clashes(mol_id)
-            self.compute_total_energy(mol_id)
+            #self.compute_total_energy(mol_id)
             
             self.interresidue_torsionals.append(molecule.get_interresidue_torsionals(self.patches))
 
@@ -2472,7 +2489,7 @@ class Sampler():
                 self.energy[k] = self.compute_inv_cum_sum_dihedral(par_list)
                 lookup.append(k)
             self.energy_lookup.append(lookup)
-            mol_id += 1
+		self.molecule_coordinates = np.zeros((idx,3))
         self.non_bonded_energy = np.array(self.non_bonded_energy) 
     
     def compute_inv_cum_sum_dihedral(self, par_list, n_points = 100):
@@ -2952,6 +2969,60 @@ class Sampler():
             idx = np.random.rand(len(offspring)) < mutation_rate
             if idx.any(): 
                 offspring[idx] = np.squeeze(np.random.rand(np.sum(idx)))
+    
+    def remove_clashes_GA_iterative(self, n_iter = 10, n_generation = 50, pop_size=40, mutation_rate=0.01, crossover_rate=0.9):
+        torsionals,n_torsionals = self._get_all_torsional_angles()
+        length = len(torsionals)
+        self.population = np.random.rand(pop_size, length)
+        self._eugenics()
+        #set input structure to first structure
+        self.population[0, :] = self._build_individue_from_angles()
+        i = 0
+        fast =  False 
+        clash = True 
+        while i < n_generation:
+            print "Generation:", i 
+            t1 = time.time()
+            sorted_population = self._evaluate_population(clash = clash, fast = fast)
+            t2 =  time.time()
+            print "Evaluation time: ", t2-t1
+
+            t1 = time.time()
+            mates = self._select_fit(sorted_population)
+            t2 = time.time()
+            if i and not i%10 and False:
+                clash = not clash
+                if clash:
+                    pop_size = int(pop_size*3)
+                    self.population =  np.zeros([pop_size, length])
+                else:
+                    pop_size = pop_size/3
+                    self.population =  np.zeros([pop_size, length])
+
+            if False and i == n_generation/2:
+                print "Evaluating self energy and reducing the size of the population"
+                clash = False
+                fast =  True
+                pop_size = pop_size/3
+                mutation_rate = 0.01
+                self.population =  np.zeros([pop_size, length])
+            elif False and i == 3*n_generation/4:
+                print "Evaluation full energy"
+                fast =  False
+
+            print "Selection time: ", t2-t1
+            t1 = time.time()
+            self._create_new_population(mates, pop_size, mutation_rate=mutation_rate, crossover_rate=crossover_rate)
+            t2 = time.time()
+            print "New population time: ", t2-t1
+            i += 1 
+            print "="*70
+#            if i > n_generation/3:
+#                self._immortalize_fittest()
+        sorted_population = self._evaluate_population(clash = clash, fast = fast)
+        self._build_individue(self.population[sorted_population[0]])
+    
+    
     
 
     def remove_clashes_GA(self, n_generation = 50, pop_size=40, mutation_rate=0.01, crossover_rate=0.9):
