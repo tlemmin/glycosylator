@@ -44,7 +44,7 @@ dihe_parameters = myGlycosylator.builder.Parameters.parameters['DIHEDRALS']
 vwd_parameters = myGlycosylator.builder.Parameters.parameters['NONBONDED']
 
 mySampler = gl.Sampler([myMan9], None, dihe_parameters, vwd_parameters)
-mySampler.remove_clashes_GA(n_generation = 15, pop_size=30, mutation_rate=0.01)
+mySampler.remove_clashes_GA_iterative(n_iter = 1, n_generation = 30, pop_size=30, mutation_rate=0.01)
 myMan9.writePDB('Man9_optimized.pdb')
 
 

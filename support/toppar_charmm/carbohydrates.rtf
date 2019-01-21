@@ -369,6 +369,36 @@ IC   2O5  1O2 *2C1  2C2    1.4290  109.48  124.60  110.70   1.5068
 IC   2O5  1O2 *2C1  2H1    1.4290  109.48 -116.61  107.55   1.1057
 
 
+PRES 12ab           0.02 ! (i)1->2(i-1) axial at C1 and equatorial at C2
+dele atom 1HO2
+dele atom 2HO1
+dele atom 2O1
+ATOM 1C2  CC3161    0.09 !
+ATOM 1O2  OC301    -0.36 !
+ATOM 2C1  CC3162    0.29 !
+BOND 1O2  2C1
+!    I    J    K    L      R(IK)   T(IKJ)    PHI   T(JKL)   R(KL)
+IC   1C1  1C2  1O2  2C1    1.5772  113.82  115.32  117.71   1.4039  ! psi
+IC   1C2  1O2  2C1  2O5    1.4740  117.71   86.93  109.52   1.3790  ! phi
+IC   1O2  2O5 *2C1  2C2    1.4042  109.49 -123.49  112.48   1.5063
+IC   2O5  1O2 *2C1  2H1    1.3790  109.52 -116.62  107.54   1.1057
+
+! equatorial-axial 1->2 linkage
+PRES 12ba           0.02 ! (i)1->2(i-1) equatorial at C1 and axial at C2
+dele atom 1HO2
+dele atom 2HO1
+dele atom 2O1
+ATOM 1C2  CC3161    0.09 !
+ATOM 1O2  OC301    -0.36 !
+ATOM 2C1  CC3162    0.29 !
+BOND 1O2  2C1
+!    I    J    K    L      R(IK)   T(IKJ)    PHI   T(JKL)   R(KL)
+IC   1C1  1C2  1O2  2C1    1.4742  111.77 -132.78  118.52   1.3902  ! psi
+IC   1C2  1O2  2C1  2O5    1.5137  118.52 -168.07  108.63   1.4500  ! phi
+IC   1O2  2O5 *2C1  2C2    1.3903  108.62  122.16  110.89   1.5315
+IC   2O5  1O2 *2C1  2H1    1.4500  108.63  121.92  111.32   1.0837
+
+
 ! equatorial-equatorial 1->4 linkage
 ! LACTOS03, EYOCUQ01, CELLOB01
 PRES 14bb           0.02 ! (i)1->4(i-1) equatorial at C1 and equatorial at C4
@@ -404,6 +434,24 @@ IC   2O5  1O6 *2C1  2C2    1.4270  109.48  124.57  110.72   1.5065
 IC   2O5  1O6 *2C1  2H1    1.4270  109.48 -116.57  107.58   1.1054
 !IC   1O6  2C1  2O5  2C5    1.4036  109.48   66.50  112.10   1.4061
 !IC   1O6  2C1  2C2  2C3    1.4036  110.72  -67.90  109.19   1.5200
+
+! equatorial-equatorial 1->6 linkage
+! GENTBSO1
+PRES 16bb          -0.07 ! (i)1->6(i-1) equatorial at C1 and equatorial at C6
+dele atom 1HO6
+dele atom 2HO1
+dele atom 2O1
+ATOM 1C6   CC321    0.00 !
+ATOM 1O6   OC301   -0.36 !
+ATOM 2C1   CC3162   0.29 !
+BOND 1O6 2C1
+!    I    J    K    L      R(IK)   T(IKJ)    PHI   T(JKL)   R(KL)
+IC   1C5  1C6  1O6  2C1    1.5616  105.37  172.71  113.93   1.3902 ! PSI
+IC   1C6  1O6  2C1  2O5    1.4311  113.93  -63.49  108.63   1.4110 ! PHI
+IC   1O6  2O5 *2C1  2C2    1.3896  108.67  122.13  110.86   1.5323
+IC   2O5  1O6 *2C1  2H1    1.4110  108.63  121.92  111.32   1.0837
+
+
 
 
 !axial-equatorial 1->3 linkage

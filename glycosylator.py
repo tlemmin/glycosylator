@@ -230,13 +230,13 @@ class CHARMMTopology:
                         elif topo_type == 'PRES':
                             self.patches[resname] = copy.copy(residue)
                             key = '-'.join(sorted([residue['BOND'][0][1:], residue['BOND'][1][1:]]))
-                            #######TODO adapt for multiple patches#####
-                            #if atomnames_to_patch.has_key(key):
-                            #    atomnames_to_patch[key].append(resname)
-                            #else:
-                            #    atomnames_to_patch[key]=[resname]
-                            ###########################################
-                            self.atomnames_to_patch[key] = resname
+                            # Allows multiple patches
+                            if key in self.atomnames_to_patch:
+                                res = self.atomnames_to_patch[key]
+                                res.append(resname)
+                                self.atomnames_to_patch[key] = res
+                            else:
+                                self.atomnames_to_patch[key] = [resname]
                     residue['dele'] = []
                     residue['ATOM'] = []
                     residue['BOND'] = []
@@ -260,11 +260,14 @@ class CHARMMTopology:
         elif topo_type == 'PRES':
             self.patches[resname] = copy.copy(residue)
             key = '-'.join(sorted([residue['BOND'][0][1:], residue['BOND'][1][1:]]))
-            #if atomnames_to_patch.has_key(key):
-            #    atomnames_to_patch[key].append(resname)
-            #else:
-            #    atomnames_to_patch[key]=[resname]
-            self.atomnames_to_patch[key] = resname
+            # Allows multiple patches
+            if key in self.atomnames_to_patch:
+                res = self.atomnames_to_patch[key]
+                res.append(resname) 
+                self.atomnames_to_patch[key] = res
+            else:
+                self.atomnames_to_patch[key] = [resname]
+            #self.atomnames_to_patch[key] = resname
 
     def read_mass(self, mass, masses):
         mass[3]=float(mass[3])
@@ -959,8 +962,8 @@ class Molecule:
             torsional = self.torsionals[torsional]
         else:
             if torsional not in self.torsionals:
-                print "Unknown torsional"
-                return -1
+                print "Warning torsional"
+                #return -1
 
         atoms = []
         a1 = torsional[-2]
@@ -1846,7 +1849,7 @@ class Glycosylator:
         kd = KDTree(sel.getCoords())
         kd.search(1.7)
         atoms = kd.getIndices()
-        if not atoms:
+        if atoms is None:
             return {}, {}
         G = nx.Graph()
         ids,rn = self.get_ids(sel) 
@@ -1901,7 +1904,12 @@ class Glycosylator:
             self.protein = self.glycoprotein.select('not ((' + ') or ('.join(sel_all) + '))').copy()
         else:
             self.protein = self.glycoprotein.copy()
-     
+    
+    def define_anomer(id1, id2, a1, a2):
+        r1 = self.get_residue(id1)
+        r2 = selt.get_residue(ids)
+        r1.select(name)
+        
     def connect_all_glycans(self, G):
         """Builds a connectivity graph for molecules (not protein) in AtomGroup. Edges with unknown patches will be removed
             Parameters:
@@ -2050,12 +2058,17 @@ class Glycosylator:
                         del_atom, b = self.builder.apply_patch(link_patch,  link_residue, new_residue)
                         bonds.extend(b)
                 else:
-                    print 'Error in connect tree!! Residue will be build de novo'
-            
-            #build first unit from DUMMY or from linked residue
-            if resid not in resids:
+                    print 'The resnames do not match in connect tree. Residue will be build de novo'
+            else:
+                if resid in resids:
+                    resid = sorted(resids)[-1] + 1
                 resids.append(resid)
-                
+
+            #build first unit from DUMMY or from linked residue
+            #if resid not in resids:
+            #    resids.append(resid)
+            
+
             if not lunit and not new_residue:
                 if link_residue and link_patch:
                     new_residue, del_atom, bonds = self.builder.build_from_patch(link_residue, resid, glycan_topo[unit], chain, segname, link_patch)
@@ -2075,7 +2088,7 @@ class Glycosylator:
                 else:
                     new_residue, del_atom, bonds = self.builder.build_from_patch(previous_residue, resid, glycan_topo[unit], chain, segname, patch)                           
             elif lunit:
-                print 'Error in connect tree!! Glycans will not be builts'
+                print 'Error in connect tree!! Glycans will not be built'
                 return [], []
 
             built_glycan[unit] = ','.join([segname, chain, str(resid),])
@@ -2288,7 +2301,7 @@ class Glycosylator:
         file.close() 
 
 
-    def find_patch(self, atom1, atom2):
+    def find_patch(self, atom1, atom2, anomer = ''):
         """Finds patch that connects two atoms
         Currently based only on atom names
         Parameters:
@@ -2299,7 +2312,12 @@ class Glycosylator:
         """
         key = '-'.join(sorted([atom1, atom2]))
         if key in self.builder.Topology.atomnames_to_patch:
-            return self.builder.Topology.atomnames_to_patch[key]
+            if anomer == '':
+                return self.builder.Topology.atomnames_to_patch[key][0]
+            else:
+                for patch in self.builder.Topology.atomnames_to_patch[key]:
+                    if patch[-2:] == anomer:
+                        return patch
         else:
              return ''
              
@@ -2413,26 +2431,29 @@ class Sampler():
         self.genes = []
         self.sample = []
         #size of environment
-        self.grid_resolution = grid_resolution
-        c = self.environment.getCoords()
-        c_min = np.min(c,axis = 0)
-        c_max = np.max(c, axis = 1)
-        c_size = int((c_max - c_min)/self.grid_resolution)
-        self.bins = [np.linspace(c_min[0], c_max[0], c_size[0]), np.linspace(c_min[1], c_max[1], c_size[1]), np.linspace(c_min[2], c_max[2], c_size[2])]
-        self.environment_grid = np.full(c_size, type=False)
-    	x_idx=np.digitize(c[:, 0], self.bins[0])-1
-        y_idx=np.digitize(c[:, 1], self.bins[1])-1
-        z_idx=np.digitize(c[:, 2], self.bins[2])-1
-        self.environment_grid[(z_idx, y_idx, x_idx)] = True
+        if self.environment:
+            self.grid_resolution = grid_resolution
+            c = self.environment.getCoords()
+            self.c_min = np.min(c,axis = 0)
+            self.c_max = np.max(c, axis = 0)
+            c_size = np.round((self.c_max - self.c_min)/self.grid_resolution).astype(int)
+            self.bins = [np.linspace(self.c_min[0], self.c_max[0], c_size[0]), np.linspace(self.c_min[1], self.c_max[1], c_size[1]), np.linspace(self.c_min[2], self.c_max[2], c_size[2])]
+            self.environment_grid = np.full(c_size, False)
+            x_idx=np.digitize(c[:, 0], self.bins[0])-1
+            y_idx=np.digitize(c[:, 1], self.bins[1])-1
+            z_idx=np.digitize(c[:, 2], self.bins[2])-1
+            self.environment_grid[(x_idx, y_idx, z_idx)] = True
         
         self.parse_patches(os.path.join(GLYCOSYLATOR_PATH,'support/topology/pres.top'))
         self.interresidue_torsionals = []
-		
-		self.coordinate_idx = np.ones(len(molecules))
-		idx = 0
+        
+        self.coordinate_idx = np.zeros(len(molecules)+1, dtype=int)
+        self.exclude_nbr_clashes = np.zeros(len(molecules))
+        idx = 0
+#        self.coordinate_idx = int(idx)
         for mol_id,molecule in enumerate(self.molecules):
-        	idx += molecule.atom_group.numAtoms
-        	self.coordinate_idx[mol_id] = idx
+            idx += molecule.atom_group.numAtoms()
+            self.coordinate_idx[mol_id + 1] = idx
             self.sample.append(True)
             self.genes.append(None)
             types = nx.get_node_attributes(molecule.connectivity, 'type')
@@ -2455,9 +2476,10 @@ class Sampler():
             lookup = []
             
             self.build_1_3_exclude_list(mol_id)
+            self.count_self_exclude(mol_id)
             #self.nbr_clashes.append(self.count_total_clashes(mol_id))
             #self.non_bonded_energy.append(self.compute_total_energy(mol_id))
-            self.count_total_clashes(mol_id)
+            #self.count_total_clashes(mol_id)
             #self.compute_total_energy(mol_id)
             
             self.interresidue_torsionals.append(molecule.get_interresidue_torsionals(self.patches))
@@ -2488,9 +2510,15 @@ class Sampler():
                 par_list = dihe_parameters[k]
                 self.energy[k] = self.compute_inv_cum_sum_dihedral(par_list)
                 lookup.append(k)
+
             self.energy_lookup.append(lookup)
-		self.molecule_coordinates = np.zeros((idx,3))
-        self.non_bonded_energy = np.array(self.non_bonded_energy) 
+
+        self.molecule_coordinates = np.zeros((idx,3))
+        self.count_total_clashes_fast()
+        #for i,molecule in enumerate(self.molecules):
+        #    i0,i1 = self.coordinate_idx[i:i+2]
+        #    self.molecule_coordinates[i0:i1, :] = molecule.atom_group.getCoords() 
+        #self.non_bonded_energy = np.array(self.non_bonded_energy) 
     
     def compute_inv_cum_sum_dihedral(self, par_list, n_points = 100):
         """Computes the an interpolation of the inverse transform sampling of a CHARMM
@@ -2549,7 +2577,6 @@ class Sampler():
         """
         molecule = self.molecules[mol_id]
         G = molecule.connectivity
-        nbr_clashes = 0
         exclude_mol = []
         for a in sorted(G.nodes()):
             exclude = set()
@@ -2559,6 +2586,55 @@ class Sampler():
             exclude_mol.append(exclude)
         self.exclude1_3.append(exclude_mol)
     
+    def count_self_exclude(self, mol_id):
+        """Counts the number bonds and 1_3 exclusion for each molecule
+        KDTree based
+        Parameters:
+            mol_id: id of molecule to consider 
+            increment: should the overwrite or update nbr_clashes
+        Returns
+            nbr_clashes: the number of clashes
+        """
+        molecule = self.molecules[mol_id]
+        kd = KDTree(molecule.atom_group.getCoords())
+        kd.search(self.clash_dist)
+        atoms = kd.getIndices()
+        exclude_mol = self.exclude1_3[mol_id]
+        c = 0
+        for a1,a2 in atoms:
+            if a1+1 in exclude_mol[a2]:
+                c += 1
+        self.exclude_nbr_clashes[mol_id] = c       
+
+    def count_total_clashes_fast(self):
+        for i,molecule in enumerate(self.molecules):
+            i0,i1 = self.coordinate_idx[i:i+2]
+            self.molecule_coordinates[i0:i1, :] = molecule.atom_group.getCoords()
+        self.count_clashes_fast()
+        self.count_environment_clashes_grid()
+
+    def count_clashes_fast(self):
+        """ Counts all the clashes for molecules at ones. KDTree == (nbr_clashes + nbr_bonds). 
+        Since nbr_bonds is constant, it is not required to recount them each time.
+        """
+        kd = KDTree(self.molecule_coordinates)
+        kd.search(self.clash_dist)
+        atoms = kd.getIndices().flatten()
+        self.nbr_clashes = np.histogram(atoms, self.coordinate_idx)[0]/2 - self.exclude_nbr_clashes 
+        
+    def count_environment_clashes_grid(self):
+        if self.environment: 
+            idx = np.all(np.logical_and(self.molecule_coordinates >= self.c_min[np.newaxis,:], self.molecule_coordinates <= self.c_max[np.newaxis,:]))
+            counts = np.zeros(idx.shape)
+            if np.sum(idx)>0:
+                x_idx = np.digitize(self.molecule_coordinates[idx, 0], self.bins[0])-1
+                y_idx = np.digitize(self.molecule_coordinates[idx, 1], self.bins[1])-1
+                z_idx = np.digitize(self.molecule_coordinates[idx, 2], self.bins[2])-1
+                print x_idx,y_idx,z_idx
+                counts[idx] = self.environment[(x_idx, y_idx, z_idx)]
+                self.nbr_clashes += np.histogram(np.argwhere(counts), self.coordinate_idx)[0]
+
+
     def count_total_clashes(self, mol_id, increment =  False):
         """Counts the total number of clashes in the system. 
         Performed in two steps:
@@ -2573,6 +2649,8 @@ class Sampler():
             self.nbr_clashes[mol_id] =  nbr_clashes
         return self.nbr_clashes[mol_id]
 
+    
+    
     def count_self_clashes(self, mol_id, increment = False):
         """Counts the number of clashes for a molecule
         KDTree based
@@ -2763,14 +2841,16 @@ class Sampler():
             angles += a
         return angles,n_torsionals
 
-    def _build_individue_from_angles(self):
+    def _build_individue_from_angles(self, mol_ids = []):
         """Generate an individue for GA based on the torsional angles present in molecules
         """
+        if not len(mol_ids):
+            mol_ids = np.arange(len(self.molecules))
         i = 0
         #set torsional angles
-        mol_id = 0
         individue = []
-        for molecule in self.molecules:
+        for mol_id in mol_ids:
+            molecule = self.molecules[mol_id]
             torsionals = molecule.get_all_torsional_angles()
             thetas = []
             t_id = 0
@@ -2781,16 +2861,19 @@ class Sampler():
             mol_id += 1
         return individue
 
-    def _eugenics(self, percentage_of_population = .75):
+    def _eugenics(self, percentage_of_population = .75, mol_ids = []):
         """Uses a set of predefined angles to bias the sampled torsional angles. torsional angles defined in pres.top will be biased
         Parameters:
             percentage_of_population: percent of the total population that should be biased
         """
+        if not len(mol_ids):
+            mol_ids = np.arange(len(self.molecules))
         i = 0
-        mol_id = 0
         
         size = int(self.population.shape[0] * percentage_of_population)
-        for molecule, interresidue in zip(self.molecules, self.interresidue_torsionals):
+        for mol_id in mol_ids:
+            molecule = self.molecules[mol_id]
+            interresidue = self.interresidue_torsionals[mol_id]
             n = len(molecule.torsionals)
             torsionals = self.population[:, i:i+n]
             for torsional_ids in interresidue.keys():
@@ -2798,6 +2881,7 @@ class Sampler():
                 patch = self.patches[p_id]
                 n = len(patch[0][1])
                 preferred_angles = np.random.randint(n, size = size)
+                #preferred_angles = self.gmm[p_id].sample(size)
                 for p,t_id in zip(patch, map(int, torsional_ids.split('-'))):
                     e = self.energy_lookup[mol_id][t_id]
                     angles = []
@@ -2808,61 +2892,53 @@ class Sampler():
                         torsional.append(np.random.uniform(t1, t2))
                     
                     torsionals[:size, t_id] = torsional
-            mol_id += 1
 
-    def _build_individue(self, individue):
+    def _build_individue(self, individue, mol_ids = []):
         """Builds and sets torsionals angles of molecules, based on a individue
         Parameter:
             individue: list of corresponding to one individue in population
         """
-        i = 0
         #set torsional angles
-        mol_id = 0
-        for molecule in self.molecules:
+        if not len(mol_ids):
+            mol_ids = np.arange(len(self.molecules))
+        i = 0
+        for mol_id in mol_ids:
+            molecule = self.molecules[mol_id]
             n = len(molecule.torsionals)
             if self.sample[mol_id]:
                 torsionals = individue[i:i+n]
                 thetas = []
-                t_id = 0
-                for t in torsionals:
+                for t_id,t in enumerate(torsionals):
                     e = self.energy_lookup[mol_id][t_id]
                     thetas.append(self.energy[e](t))
                     #thetas.append(t*360)
-                    t_id += 1
                 molecule.set_torsional_angles(molecule.torsionals, thetas, absolute = True)
             mol_id += 1
             i += n
 
-    def _evaluate_population(self, clash = False, fast = False, eval_idx = []):
+    def _evaluate_population(self, clash = False, fast = False, mol_ids = []):
         """Evaluates the fittnest of a population:
         Parameters:
             clash: boolean defing if the nonbonded energy(default) or clashes should be computed
             fast: boolean defining if the fast (and inacurate) implementation of clash/energy algorithms should be considered
-            eval_idx: only consider subgroup of molecules
+            mol_ids: only consider subgroup of molecules with index
         """
         energies = []
         t_build = []
         t_energy = []
         for p in self.population:
-            t_build.append(time.time())
-            self._build_individue(p)
-            t_build.append(time.time())
+            t_1 = time.time()
+            self._build_individue(p, mol_ids)
+            t_build.append(time.time()-t_1)
             #evaluate energy
             mol_id = 0
             energy = 0
-            t_energy.append(time.time())
-            self.nbr_clashes =  np.zeros(len(self.molecules))
-            for molecule in self.molecules:
-                if clash:
-                    energy += self.count_total_clashes(mol_id, increment = True)
-                else:
-                    energy += np.sum(self.compute_total_energy(mol_id, fast = fast))
-                mol_id += 1
-            ttt = self._get_all_torsional_angles()
-            energies.append(energy)
-            t_energy.append(time.time())
-        print "Average build time: ", np.mean(np.diff(t_build))
-        print "Average evaluation time: ", np.mean(np.diff(t_energy))
+            t_1 = time.time()
+            self.count_total_clashes_fast()
+            energies.append(np.sum(self.nbr_clashes))
+            t_energy.append(time.time()-t_1)
+        print "Average build time: ", np.mean(t_build)
+        print "Average evaluation time: ", np.mean(t_energy)
         ee = np.argsort(energies)
         print "Best energy: ", '%e' % energies[ee[0]], "|| Median energy: ", '%e' % np.median(energies), "|| Worst energy: ", '%e' % energies[ee[-1]]
         return ee
@@ -2970,58 +3046,62 @@ class Sampler():
             if idx.any(): 
                 offspring[idx] = np.squeeze(np.random.rand(np.sum(idx)))
     
-    def remove_clashes_GA_iterative(self, n_iter = 10, n_generation = 50, pop_size=40, mutation_rate=0.01, crossover_rate=0.9):
-        torsionals,n_torsionals = self._get_all_torsional_angles()
-        length = len(torsionals)
-        self.population = np.random.rand(pop_size, length)
-        self._eugenics()
-        #set input structure to first structure
-        self.population[0, :] = self._build_individue_from_angles()
-        i = 0
-        fast =  False 
-        clash = True 
-        while i < n_generation:
-            print "Generation:", i 
-            t1 = time.time()
-            sorted_population = self._evaluate_population(clash = clash, fast = fast)
-            t2 =  time.time()
-            print "Evaluation time: ", t2-t1
+    def remove_clashes_GA_iterative(self, n_iter = 10, n_individues = 5, n_generation = 50, pop_size=40, mutation_rate=0.01, crossover_rate=0.9):
+        fast = False 
+        clash = True
+        n_individues =  np.min((n_individues, len(self.molecules)))
+        for iter_cnt in np.arange(n_iter):
+            #Select individue with highest number of clashes
+            print "Iteration", iter_cnt
+            cnt = 0
+            selected_molecules = []
+            for idx in np.argsort(self.nbr_clashes)[::-1]:
+                if self.sample[idx] and self.nbr_clashes[idx] > 0.:
+                    cnt += 1
+                    selected_molecules.append(idx)
+                if cnt > n_individues:
+                    break
 
-            t1 = time.time()
-            mates = self._select_fit(sorted_population)
-            t2 = time.time()
-            if i and not i%10 and False:
-                clash = not clash
-                if clash:
-                    pop_size = int(pop_size*3)
-                    self.population =  np.zeros([pop_size, length])
-                else:
-                    pop_size = pop_size/3
-                    self.population =  np.zeros([pop_size, length])
+#            selected_molecules = np.sort(np.argsort(self.nbr_clashes)[-n_individues:])
+            selected_molecules = np.sort(selected_molecules)
+            print "Selected Molecules", selected_molecules
+            torsionals = []
+            n_torsionals = []
+            for mol_id in selected_molecules:
+                a = self.molecules[mol_id].get_all_torsional_angles()
+                n_torsionals.append(len(a))
+                torsionals += a
 
-            if False and i == n_generation/2:
-                print "Evaluating self energy and reducing the size of the population"
-                clash = False
-                fast =  True
-                pop_size = pop_size/3
-                mutation_rate = 0.01
-                self.population =  np.zeros([pop_size, length])
-            elif False and i == 3*n_generation/4:
-                print "Evaluation full energy"
-                fast =  False
+            length = len(torsionals)
+            self.population = np.random.rand(pop_size, length)
+            self._eugenics(mol_ids = selected_molecules)
+            #set input structure to first structure
+            self.population[0, :] = self._build_individue_from_angles(mol_ids = selected_molecules)
+            gen_cnt = 0
+            while gen_cnt < n_generation:
+                print "Generation:", gen_cnt 
+                t1 = time.time()
+                sorted_population = self._evaluate_population(clash = clash, fast = fast, mol_ids = selected_molecules)
+                t2 =  time.time()
+                print "Evaluation time: ", t2-t1
 
-            print "Selection time: ", t2-t1
-            t1 = time.time()
-            self._create_new_population(mates, pop_size, mutation_rate=mutation_rate, crossover_rate=crossover_rate)
-            t2 = time.time()
-            print "New population time: ", t2-t1
-            i += 1 
-            print "="*70
-#            if i > n_generation/3:
-#                self._immortalize_fittest()
-        sorted_population = self._evaluate_population(clash = clash, fast = fast)
-        self._build_individue(self.population[sorted_population[0]])
+                t1 = time.time()
+                mates = self._select_fit(sorted_population)
+                t2 = time.time()
+                print "Selection time: ", t2-t1
+                t1 = time.time()
+                self._create_new_population(mates, pop_size, mutation_rate=mutation_rate, crossover_rate=crossover_rate)
+                t2 = time.time()
+                print "New population time: ", t2-t1
+                gen_cnt += 1 
+                print "="*70
+    #            if i > n_generation/3:
+    #                self._immortalize_fittest()
+            sorted_population = self._evaluate_population(clash = clash, fast = fast, mol_ids = selected_molecules)
+            self._build_individue(self.population[sorted_population[0]], mol_ids = selected_molecules)
     
+        sorted_population = self._evaluate_population(clash = clash, fast = fast, mol_ids = selected_molecules)
+        self._build_individue(self.population[sorted_population[0]], mol_ids = selected_molecules)
     
     
 
@@ -3029,7 +3109,7 @@ class Sampler():
         torsionals,n_torsionals = self._get_all_torsional_angles()
         length = len(torsionals)
         self.population = np.random.rand(pop_size, length)
-        self._eugenics()
+        #self._eugenics()
         #set input structure to first structure
         self.population[0, :] = self._build_individue_from_angles()
         i = 0
@@ -3224,9 +3304,9 @@ class Drawer():
         """
         if not ax:
             fig, ax = plt.subplots()
-    	shape = [0, 0]
-    	shape[axis] = length/self.scaling
-    	shape[np.mod(axis+1, 2)] = 2*self.side
+        shape = [0, 0]
+        shape[axis] = length/self.scaling
+        shape[np.mod(axis+1, 2)] = 2*self.side
         p_fragment = np.array([0., 0.])
         p_fragment[axis] = -shape[axis]/2
         p_fragment[np.mod(axis+1, 2)] = -(self.side * 3.5) 
@@ -3267,9 +3347,9 @@ class Drawer():
         """
         if not ax:
             fig, ax = plt.subplots()
-    	shape = [0, 0]
-    	shape[axis] = length/self.scaling
-    	shape[np.mod(axis+1, 2)] = 2*self.side
+        shape = [0, 0]
+        shape[axis] = length/self.scaling
+        shape[np.mod(axis+1, 2)] = 2*self.side
         protein = Rectangle(np.array(pos) - self.side, shape[0], shape[1])
         patches = []
         colors = []
@@ -3423,7 +3503,7 @@ class Drawer():
                 else:
                     glyPAC += '(' + patch + ')' + names[s] 
             root = s
-	return glyPAC
+        return glyPAC
     
     def compute_positions(self, tree, root, root_pos = [0, 0], direction = 1, axis = 0 ):
         """Computes positions of vertices for drawing a tree

@@ -35,7 +35,8 @@ dihe_parameters = myGlycosylator.builder.Parameters.parameters['DIHEDRALS']
 vwd_parameters = myGlycosylator.builder.Parameters.parameters['NONBONDED']
 # 4. Consider all glycans in HIV-1 Env trimer
 mySampler = gl.Sampler(myGlycosylator.glycanMolecules.values(), myGlycosylator.protein, dihe_parameters, vwd_parameters)
-mySampler.remove_clashes_GA(n_generation = 25, pop_size=30, mutation_rate=0.01)
+#mySampler.remove_clashes_GA(n_generation = 20, pop_size=30, mutation_rate=0.01)
+mySampler.remove_clashes_GA_iterative(n_iter = 5, n_individues =  3, n_generation = 30, pop_size=30, mutation_rate=0.01)
 myGlycosylator.write_glycoprotein('HIV_optimized.pdb')
 
 
