@@ -1511,6 +1511,18 @@ class Glycosylator:
         self.glycans = {}
         self.names = {}
         self.prefix = ['segment', 'chain', 'resid', 'icode']
+    
+    def init_glycoprotein(self):
+        """Initializes all the variables
+        """
+        self.glycoprotein = None 
+        self.protein = None
+        self.sequences = {}
+        self.sequons = {}
+        self.glycanMolecules = {}
+        self.glycans = {}
+        self.names = {}
+
 
     def read_connectivity_topology(self, connectfile):
         """Parse file defining the topology of connectivity trees.
@@ -1659,6 +1671,7 @@ class Glycosylator:
         Parameters:
             protein: Atomgroup of 
         """
+        self.init_glycoprotein()
         if type(protein) == str:
             protein = parsePDB(protein)
         self.glycoprotein = protein
@@ -2048,6 +2061,7 @@ class Glycosylator:
                 resids.append(resid)
                 if sel_residue.getResnames()[0] == glycan_topo[unit]:
                     built_glycan[unit] = ','.join([segname, chain, str(resid),])
+                    #print resid,inv_template_glycan_tree[unit],','.join([segname, chain, str(resid),])
                     #built_glycan[unit] = inv_template_glycan_tree[unit]
                     new_residue,missing_atoms,bonds = self.builder.add_missing_atoms(sel_residue, resid, chain, segname)
                     ics = self.builder.Topology.topology[glycan_topo[unit]]['IC']
@@ -2624,14 +2638,13 @@ class Sampler():
         
     def count_environment_clashes_grid(self):
         if self.environment: 
-            idx = np.all(np.logical_and(self.molecule_coordinates >= self.c_min[np.newaxis,:], self.molecule_coordinates <= self.c_max[np.newaxis,:]))
+            idx = np.all(np.logical_and(self.molecule_coordinates >= self.c_min[np.newaxis,:], self.molecule_coordinates <= self.c_max[np.newaxis,:]), axis = 1)
             counts = np.zeros(idx.shape)
             if np.sum(idx)>0:
                 x_idx = np.digitize(self.molecule_coordinates[idx, 0], self.bins[0])-1
                 y_idx = np.digitize(self.molecule_coordinates[idx, 1], self.bins[1])-1
                 z_idx = np.digitize(self.molecule_coordinates[idx, 2], self.bins[2])-1
-                print x_idx,y_idx,z_idx
-                counts[idx] = self.environment[(x_idx, y_idx, z_idx)]
+                counts[idx] = self.environment_grid[x_idx, y_idx, z_idx]
                 self.nbr_clashes += np.histogram(np.argwhere(counts), self.coordinate_idx)[0]
 
 
