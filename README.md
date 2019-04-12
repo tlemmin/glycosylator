@@ -1,6 +1,5 @@
-
 ![alt text](./icons/glycosylator_logo.png)
-# Glycosylator: a Python framework for the rapid modeling of glycans
+# A Python framework for the rapid modeling of glycans
 Glycosylator is a Python framework for the identification, modeling and
 modification of glycans in protein structure. It can be used directly in a Python script
 through its API or through its Graphical User Interface (GUI). The GUI provides a
@@ -19,25 +18,37 @@ numpy == 1.15.1
 matplotlib == 2.1.2
 networkx == 2.1
 ```
-## Running glycosylator
+## Usage 
 To open the GUI:
-`python glycosylator_GUI.py`
+```python glycosylator_GUI.py```
+
+In Python script:
+```
+import glycosylator as gl
+myGlycosylator = gl.Glycosylator(os.path.join(gl.GLYCOSYLATOR_PATH, 'support/toppar_charmm/carbohydrates.rtf'), os.path.join(gl.GLYCOSYLATOR_PATH, 'support/toppar_charmm/carbohydrates.prm'))
+myGlycosylator.builder.Topology.read_topology(os.path.join(gl.GLYCOSYLATOR_PATH, 'support/topology/DUMMY.top'))
+#Load topology information about glycans
+myGlycosylator.read_connectivity_topology(os.path.join(gl.GLYCOSYLATOR_PATH, 'support/topology/mannose.top'))
+# 3. Automatically detect all sequons and N-linked glycans
+print 'Loading glycoprotein'
+myGlycosylator.load_glycoprotein(os.path.join(gl.GLYCOSYLATOR_PATH, 'support/examples/env_4tvp.pdb'))
+myGlycosylator.build_glycan_topology(patch = 'NGLB')
+```
 
 ## Demo
-The demo folder contains a 7 examples, showing how to use the different classes provided by Glycosylator.
+The demo folder contains 7 examples, showing how to use the different classes provided by Glycosylator.
 
 - The Molecule class is used for storing the coordinates (Prody’s AtomGroup) and
-connectivity (NetworkX graph) of a molecule.
-- The MoleculeBuilder class is employed for building and editing molecules.
-- Glycosylator class was designed to deal specifically with glycans/glycoprotein.
-Sampler class implements a genetic algorithm for removing clashes between
-- Molecules and their environment (e.g. protein).
-- Drawer class is used for generating 2D symbolic representations of glycans
-according to the UIPAC standard.
+connectivity (NetworkX graph) of a molecule
+- The MoleculeBuilder class is employed for building and editing molecules
+- Glycosylator class was designed to deal specifically with glycans/glycoprotein and model glycans
+- Sampler class implements a genetic algorithm for removing clashes between Molecules and their environment (e.g. protein)
+- Drawer class is used for generating 2D symbolic representations of glycans according to the UIPAC standard
 
 ## Glycan text representation
-A UNIT is defined by its residue name (3 letter code from PDB), the connecting atom, and the path from the root UNIT. The root UNIT is the first glycan is connected to the sequon.
-The path is defined by the patches that have applied to connect previous UNIT.
+Glycosylator uses a text representation to identify or build glycans.
+A UNIT is defined by its residue name (3 letter code from PDB), the connecting atom, and the path from the root UNIT. The root UNIT is the first glycan that is connected to the sequon.
+The path is defined by the patches (PRES in CHARMM ff) that are applied to connect to the previous UNIT.
 Example for mannose 3:
 ```
                                          -16ab-> MAN[Z4] -13ab-> MAN[Z7]
@@ -55,3 +66,8 @@ The corresponding text representation (connectivity topology):
     UNIT MAN C1 14bb 14bb 13ab              !Z9 Unit connected with 13ab to Z3 [path from root: 14bb 14bb]
 ```
 
+## Contributing
+
+
+## License
+[MIT](https://choosealicense.com/licenses/mit/)
