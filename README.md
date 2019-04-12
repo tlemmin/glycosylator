@@ -36,7 +36,7 @@ myGlycosylator.build_glycan_topology(patch = 'NGLB')
 ```
 
 ## Demo
-The demo folder contains 7 examples, showing how to use the different classes provided by Glycosylator.
+The demo folder contains several examples, showing how to use the different classes provided by Glycosylator.
 
 - The Molecule class is used for storing the coordinates (Prody’s AtomGroup) and
 connectivity (NetworkX graph) of a molecule
