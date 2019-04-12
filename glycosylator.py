@@ -2035,6 +2035,7 @@ class Glycosylator:
         resid = 1
         sorted_units =  sorted(glycan_topo.keys(), key = len)
         for unit in sorted_units:
+            
             new_residue = None
             if unit:
                 lunit = unit.split(' ')
@@ -2326,6 +2327,8 @@ class Glycosylator:
         """
         key = '-'.join(sorted([atom1, atom2]))
         if key in self.builder.Topology.atomnames_to_patch:
+            #for patch in self.builder.Topology.atomnames_to_patch[key]:
+            #    self.builder.Topology[patch]['ICs']
             if anomer == '':
                 return self.builder.Topology.atomnames_to_patch[key][0]
             else:
@@ -2420,7 +2423,7 @@ class Glycosylator:
 class Sampler():
     """Class to sample conformations, based on a 
     """
-    def __init__(self, molecules, envrionment, dihe_parameters, vdw_parameters, clash_dist = 1.8, grid_resolution = 1.0):
+    def __init__(self, molecules, envrionment, dihe_parameters, vdw_parameters, clash_dist = 1.8, grid_resolution = 1.5):
         """ 
         Parameters
             molecules: list of Molecules instances
@@ -2447,7 +2450,7 @@ class Sampler():
         #size of environment
         if self.environment:
             self.grid_resolution = grid_resolution
-            c = self.environment.getCoords()
+            c = self.environment.select('not resname ASN').getCoords()
             self.c_min = np.min(c,axis = 0)
             self.c_max = np.max(c, axis = 0)
             c_size = np.round((self.c_max - self.c_min)/self.grid_resolution).astype(int)
