@@ -1,5 +1,6 @@
 
-# ![alt text](./icons/glycosylator_logo.png): a Python framework for the rapid modeling of glycans
+![alt text](./icons/glycosylator_logo.png)
+# Glycosylator: a Python framework for the rapid modeling of glycans
 Glycosylator is a Python framework for the identification, modeling and
 modification of glycans in protein structure. It can be used directly in a Python script
 through its API or through its Graphical User Interface (GUI). The GUI provides a
