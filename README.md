@@ -1,17 +1,27 @@
 # Glycosylator: a Python framework for the rapid modeling of glycans
-
-
-
-## Installation
+Glycosylator is a Python framework for the identification, modeling and
+modification of glycans in protein structure. It can be used directly in a Python script
+through its API or through its Graphical User Interface (GUI). The GUI provides a
+straightforward 2D rendering of a glycoprotein that allows for a quick visual inspection of
+the gylcosylation state of all the sequons on a protein structure. Modeled glycans can
+be further refined by a genetic algorithm for removing clashes and sampling alternative
+conformations. Glycosylator can also identify specific 3D glycans on a protein structure
+using a library of predefined templates.
 
 ## Computing Environment
-The following packages are required:
+Glycosylator was developed with the following packages:
 ```
-prody
-numpy
-matplotlib
-networkx
+prody == 1.9.4
+numpy == 1.15.1
+matplotlib == 2.1.2
+networkx == 2.1
 ```
+## Running glycosylator
+To open the GUI:
+`python glycosylator_GUI.py`
+
+## Demo
+The demo folder contains a 7 examples, showing how to use the different classes provided by Glycosylator.
 
 ## Glycan text representation
 A UNIT is defined by its residue name (3 letter code from PDB), the connecting atom, and the path from the root UNIT. The root UNIT is the first glycan is connected to the sequon.
