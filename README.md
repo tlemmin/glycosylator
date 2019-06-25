@@ -65,7 +65,13 @@ The corresponding text representation (connectivity topology):
     UNIT MAN C1 14bb 14bb 16ab 13ab         !Z7 Unit connected with 13ab to Z4 [path from root: 14bb 14bb 16ab]
     UNIT MAN C1 14bb 14bb 13ab              !Z9 Unit connected with 13ab to Z3 [path from root: 14bb 14bb]
 ```
-
+## Adding new monosaccaride
+Glycosylator uses the internal coordinates (IC) to build molecules. It requires the absence of circular dependency.
+The easiest is to extract the coordinates from a PDB file of the optimized monomer. 
+Two scripts are available for generating the coordinates: ./support/scripts/
+ - buildICs.py: will compute all values for a list of ICs.
+ - XML2PDB.py: extracts the structure from RCSB XML molecule file. 
+ 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 

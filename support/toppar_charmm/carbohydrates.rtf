@@ -352,6 +352,68 @@ IC C3 C4 O4 HO4  1.53 109.61 -179.95 106.81 0.97
 
 PATCH FIRST NONE LAST NO
 
+RESI GAL           0.000  ! 4C1 beta-D-galactose
+                           !
+GROU                       !
+ATOM C1   CC3162    0.340  !                  O6-HO6
+ATOM H1   HCA1      0.090  !                  |
+ATOM O1   OC311    -0.650  !              H61-C6-H62
+ATOM HO1  HCP1      0.420  !                  |
+ATOM C5   CC3163    0.110  !               H5-C5---O5
+ATOM H5   HCA1      0.090  !        HO4-O4   /       \    O1-HO1
+ATOM O5   OC3C61   -0.400  !              \ / HO3     \  /
+GROU                       !               C4 |        C1
+ATOM C2   CC3161    0.140  !              / \ O3   H2 /  \
+ATOM H2   HCA1      0.090  !            H4   \|    | /    H1
+ATOM O2   OC311    -0.650  !                  C3---C2
+ATOM HO2  HCP1      0.420  !                  |    |
+GROU                       !                  H3   O2-HO2
+ATOM C3   CC3161    0.140  !
+ATOM H3   HCA1      0.090  !
+ATOM O3   OC311    -0.650  !
+ATOM HO3  HCP1      0.420  !
+GROU
+ATOM C4   CC3161    0.140
+ATOM H4   HCA1      0.090
+ATOM O4   OC311    -0.650
+ATOM HO4  HCP1      0.420
+GROU
+ATOM C6   CC321     0.050
+ATOM H61  HCA2      0.090
+ATOM H62  HCA2      0.090
+ATOM O6   OC311    -0.650
+ATOM HO6  HCP1      0.420
+!
+BOND C1   O1        C1   H1        O1   HO1       C1   O5        C1   C2
+BOND C2   H2        C2   O2        O2   HO2       C2   C3        C3   H3
+BOND C3   O3        O3   HO3       C3   C4        C4   H4        C4   O4
+BOND O4   HO4       C4   C5        C5   H5        C5   C6        C6   H61
+BOND C6   H62       C6   O6        O6   HO6       C5   O5
+!    I    J    K    L      R(IK)   T(IKJ)    PHI   T(JKL)   R(KL)
+IC C2 C1 O5 C5  1.53 109.40 -61.12 114.13 1.43
+IC C5 O5 C1 C2  1.43 114.13 -61.12 109.40 1.53
+IC O5 C1 C2 C3  1.43 109.40 57.61 109.20 1.53
+IC C1 O5 C5 C4  1.43 114.13 61.11 109.39 1.53
+IC C5 O5 C1 O1  1.43 114.13 178.90 109.49 1.43
+IC O2 C2 C1 H1  1.43 109.51 57.58 109.48 1.09
+IC O5 C1 C2 O2  1.43 109.40 177.54 109.51 1.43
+IC O2 C3 C2 H2  2.42 33.84 -120.14 109.51 1.09
+IC C1 C2 C3 O3  1.53 109.20 -176.84 109.58 1.43
+IC O3 C4 C3 H3  2.42 33.84 120.27 109.56 1.09
+IC C2 C3 C4 O4  1.53 109.02 -62.92 109.55 1.43
+IC O4 C5 C4 H4  2.42 33.84 120.15 109.45 1.09
+IC C6 O5 C5 H5  2.42 36.61 120.05 109.47 1.09
+IC C1 O5 C5 C6  1.43 114.13 -178.87 109.51 1.53
+IC C4 C5 C6 O6  1.53 109.51 -175.03 109.45 1.43
+IC O6 C5 C6 H62  2.42 33.91 -119.97 109.49 1.09
+IC O6 H62 C6 H61  2.07 40.73 -119.98 109.49 1.09
+IC O5 C1 O1 HO1  1.43 109.49 -60.04 113.96 0.97
+IC C1 C2 O2 HO2  1.53 109.51 59.95 114.06 0.97
+IC C2 C3 O3 HO3  1.53 109.58 -60.03 113.96 0.97
+IC C3 C4 O4 HO4  1.53 109.55 -60.01 113.99 0.97
+IC C5 C6 O6 HO6  1.53 109.45 -179.99 113.96 0.97
+PATCH FIRST NONE LAST NO
+
 ! axial-axial 1->2 linkage
 ! use for FABYOW axial mannopyranose
 PRES 12aa           0.02 ! (i)1->2(i-1) axial at C1 and axial at C2
@@ -514,6 +576,30 @@ IC   1HD22 1ND2 2C1   2O5         1.0117  111.10  108.04  104.39   1.4413
 IC   2C5   2O5  2C1   2H1         1.4242  116.13   41.53  110.40   1.1136
 IC   1ND2  2C1  2O5   2C5         1.3783  104.39  165.66  116.13   1.4242
 
+PRES CERB           0.11 ! og equatorial patch of ceramide to C1 [based on patch OCTB]
+                         ! e.g., patch CERB CARB CER
+dele atom 1HO1
+dele atom 2HO1
+dele atom 2O1 
 
+GROUP
+ATOM 2C1  CC3162    0.29 !
+ATOM 2O1  OC301    -0.36 !
 
+ATOM 1C1S CTO2      0.00 !
+ATOM 1H1S HAL2      0.09 !
+ATOM 1H1T HAL2      0.09 !
 
+BOND 1O1 2C1
+
+!    I    J    K    L      R(IK)   T(IKJ)    PHI   T(JKL)   R(KL)
+IC   1C1S 1O1  2C1  2O5     1.42    111.36 -83.30   103.27   1.4302 
+IC   1C2S 1C1S 1O1  2C1     1.54    110.89 -171.80  111.36   1.44
+IC   2C5  2O5  2C1   2H1    1.4242  116.13   41.53  110.40   1.1136
+IC   1O1  2C1  2O5   2C5    1.3783  104.39  165.66  116.13   1.4242
+
+!IC  2O5  2C1  2O1  1C1S    1.4302  103.27  -83.30  111.36   1.4262
+!IC  2C1  2O1  1C1S 1C2S    1.4465  111.36 -171.80  110.89   1.5408
+!IC  2O1  1C1S 1C2S 1C3S    1.4262  110.89 -178.19  111.72   1.5390
+!IC  1C2S 2O1 *1C1S 1H1S    1.5661  113.71 -128.80  113.66   1.0672
+!IC  1C2S 2O1 *1C1S 1H1T    1.5661  113.71  111.70  104.83   1.1576
