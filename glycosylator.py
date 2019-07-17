@@ -2054,7 +2054,8 @@ class Glycosylator:
                         sel.append(p + ' ' + s)
                 sel = ' and '.join(sel)
                 sel_residue = template_glycan.select(sel)
-                resid =  sel_residue.getResnums()[0]
+                #autopsf prefers if resids are incremental
+                #resid =  sel_residue.getResnums()[0]
                 
                 if resid in resids:
                     resid = sorted(resids)[-1] + 1
