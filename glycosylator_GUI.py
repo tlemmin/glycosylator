@@ -146,7 +146,7 @@ class GlycosylatorGUI(tk.Tk):
         self.glycoprotein_2D.bind("<Button-5>", self._on_mousewheel)
 
         self.detach_button = tk.Button(self.left_frame, command = self.detach_plot)
-        self.detach_icon = tk.PhotoImage(file="icons/detach.gif")
+        self.detach_icon = tk.PhotoImage(file = SELF_BIN + "/icons/detach.gif")
         self.detach_button.config(image = self.detach_icon)
         #Layout left frame
         self.glycoprotein_2D.grid(column = 0, row= 0, sticky='NSEW')
@@ -157,7 +157,7 @@ class GlycosylatorGUI(tk.Tk):
         self.left_frame.rowconfigure(0, weight=6)
 
         # Create widget for right frame       
-        self.glycosylator_logo = tk.PhotoImage(file="icons/glycosylator_logo.gif")
+        self.glycosylator_logo = tk.PhotoImage(file = SELF_BIN + "/icons/glycosylator_logo.gif")
         self.w_logo = tk.Label(self.right_frame, image=self.glycosylator_logo, bg = 'white')
         self.chain_label = tk.Label(self.right_frame, text="Chain:", bg = 'white')
         options = ['-']
@@ -177,7 +177,7 @@ class GlycosylatorGUI(tk.Tk):
         self.glycan_name.bind(self.glycan_2D, 'No sequon has been selected')
 
         self.undo_button = tk.Button(self.right_frame, command = self.undo_glycan)
-        self.undo_icon = tk.PhotoImage(file="icons/undo.gif")
+        self.undo_icon = tk.PhotoImage(file = SELF_BIN + "/icons/undo.gif")
         self.undo_button.config(image = self.undo_icon)
         self.glycan_name.bind(self.undo_button, 'Undo glycosylation')
         
@@ -471,19 +471,19 @@ class GlycosylatorGUI(tk.Tk):
         self.ug_button_frame.grid(column = 0, row = 1, sticky= 'SE')
         #add buttons for import
         self.ug_import = tk.Button(self.ug_button_frame, command = self.import_library)
-        self.import_icon = tk.PhotoImage(file="icons/import.gif")
+        self.import_icon = tk.PhotoImage(file = SELF_BIN + "icons/import.gif")
         self.ug_import.config(image = self.import_icon)
 
         self.ug_export = tk.Button(self.ug_button_frame, command = self.export_library)
-        self.export_icon = tk.PhotoImage(file="icons/export.gif")
+        self.export_icon = tk.PhotoImage(file = SELF_BIN + "icons/export.gif")
         self.ug_export.config(image = self.export_icon)
         
         self.ug_add = tk.Button(self.ug_button_frame, command = self.add_glycan_form)
-        self.add_icon = tk.PhotoImage(file="icons/add.gif")
+        self.add_icon = tk.PhotoImage(file = SELF_BIN + "icons/add.gif")
         self.ug_add.config(image = self.add_icon)
         
         self.ug_delete = tk.Button(self.ug_button_frame, command = self.delete_glycan)
-        self.delete_icon = tk.PhotoImage(file="icons/delete.gif")
+        self.delete_icon = tk.PhotoImage(file = SELF_BIN + "icons/delete.gif")
         self.ug_delete.config(image = self.delete_icon)
 
         self.ug_import.grid(column = 0, row = 0)
