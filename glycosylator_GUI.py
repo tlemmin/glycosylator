@@ -471,19 +471,19 @@ class GlycosylatorGUI(tk.Tk):
         self.ug_button_frame.grid(column = 0, row = 1, sticky= 'SE')
         #add buttons for import
         self.ug_import = tk.Button(self.ug_button_frame, command = self.import_library)
-        self.import_icon = tk.PhotoImage(file = SELF_BIN + "icons/import.gif")
+        self.import_icon = tk.PhotoImage(file = SELF_BIN + "/icons/import.gif")
         self.ug_import.config(image = self.import_icon)
 
         self.ug_export = tk.Button(self.ug_button_frame, command = self.export_library)
-        self.export_icon = tk.PhotoImage(file = SELF_BIN + "icons/export.gif")
+        self.export_icon = tk.PhotoImage(file = SELF_BIN + "/icons/export.gif")
         self.ug_export.config(image = self.export_icon)
         
         self.ug_add = tk.Button(self.ug_button_frame, command = self.add_glycan_form)
-        self.add_icon = tk.PhotoImage(file = SELF_BIN + "icons/add.gif")
+        self.add_icon = tk.PhotoImage(file = SELF_BIN + "/icons/add.gif")
         self.ug_add.config(image = self.add_icon)
         
         self.ug_delete = tk.Button(self.ug_button_frame, command = self.delete_glycan)
-        self.delete_icon = tk.PhotoImage(file = SELF_BIN + "icons/delete.gif")
+        self.delete_icon = tk.PhotoImage(file = SELF_BIN + "/icons/delete.gif")
         self.ug_delete.config(image = self.delete_icon)
 
         self.ug_import.grid(column = 0, row = 0)
