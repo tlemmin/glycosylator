@@ -1,0 +1,3 @@
+sequence_file.seq: Glycan sequence file
+5fyl_G.pdb: Output from doGlycans
+5fyl_min.pdb: Structure aftwer 5000 steps of minimization
