@@ -1,0 +1,3 @@
+sequence_file.seq: Glycan sequence file
+6bfy_G.pdb: Output from doGlycans
+6bfy_min.pdb: Structure aftwer 5000 steps of minimization
