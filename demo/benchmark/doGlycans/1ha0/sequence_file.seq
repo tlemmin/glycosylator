@@ -1,0 +1,26 @@
+A=P.81/HD22:-(ND2,C1,<Ae>)-4YB-(O4,C1,<a>)-4YB-(O4,C1,<b>)-VMB<branch1a>-(O6,C1,<c>)-VMA<branch2a>-(O6,C1,<c>)-2MA-(O2,C1,<Cg>)-0MA
+branch1a = C.4:-(O3,C1,<d>)-2MA-(O2,C1,<Cf>)-2MA-(O2,C1,<Cg>)-0MA
+branch2a = C.4:-(O3,C1,<d>)-2MA-(O2,C1,<Cg>)-0MA
+a = O4,C1,[C3 C4 O4 C1   60.0 C4 O4 C1 C2 120.0]
+b = O4,C1,[C3 C4 O4 C1  100.0 C4 O4 C1 C2  60.0]
+c = O6,C1,[C4 C5 C6 O6   120.0 C5 C6 O6 C1 150.0 C6 O6 C1 C2 180.0]
+d = O3,C1,[C2 C3 O3 C1  120.0 C3 O3 C1 C2 -60.0]
+Ae=ND2,C1,[CB CG ND2 C1 180 CG ND2 C1 C2 130]
+Cg=O2,C1,[C3 C2 O2 C1 -60.0 C2 O2 C1 C2 220.0]
+Cf=O2,C1,[C3 C2 O2 C1 205.0 C2 O2 C1 C2 180.0]
+
+B=P.285/HD22:-(ND2,C1,<Ae>)-4YB-(O4,C1,<a>)-4YB-(O4,C1,<b>)-VMB<branch1b>-(O6,C1,<c>)-VMA<branch2b>-(O6,C1,<c>)-2MA-(O2,C1,<Cg>)-0MA
+branch1b = C.4:-(O3,C1,<d>)-2MA-(O2,C1,<Cf>)-2MA-(O2,C1,<Cg>)-0MA
+branch2b = C.4:-(O3,C1,<d>)-2MA-(O2,C1,<Cg>)-0MA
+C=P.483/HD22:-(ND2,C1,<Ae>)-4YB-(O4,C1,<a>)-4YB-(O4,C1,<b>)-VMB<branch1c>-(O6,C1,<c>)-VMA<branch2c>-(O6,C1,<c>)-2MA-(O2,C1,<Cg>)-0MA
+branch1c = C.4:-(O3,C1,<d>)-2MA-(O2,C1,<Cf>)-2MA-(O2,C1,<Cg>)-0MA
+branch2c = C.4:-(O3,C1,<d>)-2MA-(O2,C1,<Cg>)-0MA
+D=P.38/HD22:-(ND2,C1,<Ae>)-4YB-(O4,C1,<a>)-4YB-(O4,C1,<b>)-VMB<branch1d>-(O6,C1,<c>)-VMA<branch2d>-(O6,C1,<c>)-2MA-(O2,C1,<Cg>)-0MA
+branch1d = C.4:-(O3,C1,<d>)-2MA-(O2,C1,<Cf>)-2MA-(O2,C1,<Cg>)-0MA
+branch2d = C.4:-(O3,C1,<d>)-2MA-(O2,C1,<Cg>)-0MA
+E=P.22/HD22:-(ND2,C1,<Ae>)-4YB-(O4,C1,<a>)-4YB-(O4,C1,<b>)-VMB<branch1e>-(O6,C1,<c>)-VMA<branch2e>-(O6,C1,<c>)-2MA-(O2,C1,<Cg>)-0MA
+branch1e = C.4:-(O3,C1,<d>)-2MA-(O2,C1,<Cf>)-2MA-(O2,C1,<Cg>)-0MA
+branch2e = C.4:-(O3,C1,<d>)-2MA-(O2,C1,<Cg>)-0MA
+F=P.165/HD22:-(ND2,C1,<Ae>)-4YB-(O4,C1,<a>)-4YB-(O4,C1,<b>)-VMB<branch1f>-(O6,C1,<c>)-VMA<branch2f>-(O6,C1,<c>)-2MA-(O2,C1,<Cg>)-0MA
+branch1f = C.4:-(O3,C1,<d>)-2MA-(O2,C1,<Cf>)-2MA-(O2,C1,<Cg>)-0MA
+branch2f = C.4:-(O3,C1,<d>)-2MA-(O2,C1,<Cg>)-0MA
