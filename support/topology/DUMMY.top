@@ -16,3 +16,12 @@ dele atom 1D3 !to remove bond
 IC   1D1   1D2  1D3  2C1     1.4000  120.00  180.00  120.00   1.4000
 IC   1D2   1D3 2C1   2O5     1.4000  120.00 -120.00  120.00   1.4000
 IC   1D3  2C1  2O5   2C5     1.4000  120.00  180.00  120.00   1.4000
+
+PRES DUMMY_MNA 0
+!Patch for building a MNA
+BOND 1D3 2C1              !
+dele atom 1D3 !to remove bond
+!    I     J    K    L      R(IK)   T(IKJ)    PHI   T(JKL)   R(KL)
+IC   1D1   1D2  1D3  2C2     1.4000  120.00  180.00  120.00   1.4000
+IC   1D2   1D3 2C2   2O6     1.4000  120.00 -120.00  120.00   1.4000
+IC   1D3  2C2  2O6   2C6     1.4000  120.00  180.00  120.00   1.4000
