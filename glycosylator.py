@@ -2501,7 +2501,7 @@ class Sampler():
             #self.compute_total_energy(mol_id)
             
             self.interresidue_torsionals.append(molecule.get_interresidue_torsionals(self.patches))
-
+            self.energy['skip'] = self.compute_inv_cum_sum_dihedral([[0.35, 1.0, 0.0]])
             for dihe in molecule.torsionals:
                 atypes = []
                 for d in dihe:
