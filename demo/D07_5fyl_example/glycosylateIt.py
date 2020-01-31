@@ -53,7 +53,9 @@ print 'Building glycans'
 for sequon_id in myGlycosylator.sequons:
     sequon = myGlycosylator.get_residue(sequon_id)
     seg,chain,resid,i =  sequon_id.split(',')
-    
+    #skip unglycosylated sequons
+    if resid not in glycosylation:
+        continue
     glycan_name = glycosylation[resid]
     segname = chain + resid
     #extend exiting glycans    
@@ -67,6 +69,7 @@ for sequon_id in myGlycosylator.sequons:
 
     new_glycan = gl.Molecule(sequon_id)
     new_glycan.set_AtomGroup(glycan, bonds = bonds)
+    new_glycan.update_connectivity(update_bonds = False)
     myGlycosylator.assign_patches(new_glycan)
     at = myGlycosylator.assign_atom_type(new_glycan) 
     new_glycan.set_atom_type(at)
