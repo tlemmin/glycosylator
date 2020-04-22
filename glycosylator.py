@@ -1500,6 +1500,7 @@ class Glycosylator:
             glycans: dictionary with protein residue as keys and graph of connected glycan as values
             names: dictionary of residue names for linked glycans
         """
+        self.topofile = topofile
         self.builder = MoleculeBuilder(topofile, paramfile)
         self.connect_topology = {}
         self.glycan_keys = {}
@@ -1789,8 +1790,71 @@ class Glycosylator:
         glycoprotein.setAltlocs(altloc)
         writePDB(filename, glycoprotein)
         
+    def write_psfgen(self, dirName, proteinName=None):
+        """ This function will create the configure file for psfgen. The glycans will be split from the rest of the structure.
+        It will be assumed that the topology file for the protein has already been previously built. Each glycan will be saved to a seperate file
+        Parameters:
+            dirName: name for output directory
+            proteinName: path to topology (.psf) and coordinate (.pdb) files of the protein 
+        """
+        try:
+            os.mkdir(dirName)
+        except:
+            print("Directory " , dirName ,  " already exists. Please provide a new name")
+            return -1
+        os.chdir(dirName)
+        psfbuffer = []
+        psfbuffer.append("package require psfgen")
+        psfbuffer.append("psfcontext reset")
+        psfbuffer.append("topology {}".format(self.topofile)) 
 
+        for g in self.glycanMolecules.values():
+            ag = g.atom_group
+            segname = g.get_segname()
+            writePDB(segname + '.pdb', ag)
+            psfbuffer.append("segment {} {{pdb {}.pdb}}".format(segname, segname))
+            patches = g.get_patches()
+            for patch in patches:
+                id1,id2 = patch
+                patch_name = patches[patch]
+                s1,c,r1,i = id1.split(',')
+                s2,c,r2,i = id2.split(',')
+                psfbuffer.append("patch {} {}:{} {}:{}".format(patch_name, s1, r1, s2, r2))
+            psfbuffer.append("coordpdb {}.pdb".format(s1))
+            psfbuffer.append("guesscoord")
+            psfbuffer.append("")
+        psfbuffer.append("writepsf glycans.psf")
+        psfbuffer.append("writepdb glycans.pdb")
+        psfbuffer.append("")
+        psfbuffer.append("psfcontext reset")
+        psfbuffer.append("topology {}".format(self.topofile)) 
+        if proteinName:
+            psfbuffer.append("readpsf {}.psf".format(proteinName))
+            psfbuffer.append("coordpdb {}.pdb".format(proteinName))
+        else:
+            psfbuffer.append("#!!!!ADD PROTEIN NAME HERE!!!!") 
+            psfbuffer.append("readpsf protein.psf")
+            psfbuffer.append("coordpdb protein.pdb")
+        psfbuffer.append("readpsf glycans.psf")
+        psfbuffer.append("coordpdb glycans.pdb")
+        psfbuffer.append("")
+        # TODO !!!hard coded!!! Should be patch dependent
+        for res in self.glycanMolecules:
+            s,c,r,i = res.split(',')
+            sg, cg, rg, ig = self.glycanMolecules[res].rootRes.split(',')
+            psfbuffer.append("patch NGLB {}:{} {}:{}".format(s,r,sg,rg))
+        psfbuffer.append("regenerate angles dihedrals")
+        if proteinName:
+            psfbuffer.append("writepsf {}_glycosylated.psf".format(proteinName))
+            psfbuffer.append("writepdb {}_glycosylated.pdb".format(proteinName))
+        else:
+            psfbuffer.append("writepsf glycoprotein.psf")
+            psfbuffer.append("writepdb glycoprotein.pdb")
+        psfbuffer.append("exit")
         
+        with open("psfgen.conf", "w") as f:
+            f.write("\n".join(psfbuffer))
+
 
     def get_residue(self, res_id):
         """Returns an AtomGroup of given atom id; composed of 'segname,chain,resid,icode,atomName'
