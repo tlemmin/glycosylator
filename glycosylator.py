@@ -3603,7 +3603,7 @@ class SamplerPSO():
         print "Best energy: ", '%e' % energies[ee[0]], "|| Median energy: ", '%e' % np.median(energies), "|| Worst energy: ", '%e' % energies[ee[-1]]
         return ee
 
-        def _eugenics(self, positions, percentage_of_positions = .75, mol_ids = []):
+    def _eugenics(self, positions, percentage_of_positions = .75, mol_ids = []):
         """Uses a set of predefined angles to bias the sampled torsional angles. torsional angles defined in pres.top will be biased
         Parameters:
             percentage_of_positions: percent of the total population that should be biased
@@ -3645,17 +3645,17 @@ class SamplerPSO():
                 energy: current energy of the particle
         """
         def __init__(self, x0, inertia = 0.05, cognitive_cst = 0.1, social_cst = 0.2):
-            self.position = x0          							  # particle position
+            self.position = x0                                        # particle position
             self.velocity = 2*np.random.rand(x0.shape[0])-1           # particle velocity
-            self.pos_best = []										  # best position individual
-            self.lowest_energy = np.Inf 							  # lowest energy individual
-            self.energy = np.Inf        							  # current energy individual
-            self.w = inertia            							  # inertia constant
-            self.c1 = cognitive_cst     							  # cognitive constant
-            self.c2 = social_cst        							  # social constant   
+            self.pos_best = []                                          # best position individual
+            self.lowest_energy = np.Inf                               # lowest energy individual
+            self.energy = np.Inf                                      # current energy individual
+            self.w = inertia                                          # inertia constant
+            self.c1 = cognitive_cst                                   # cognitive constant
+            self.c2 = social_cst                                      # social constant   
       
         def update_energy(self, energy):
-        	self.energy = energy
+            self.energy = energy
             # check to see if the current position is an individual best
             if self.energy < self.lowest_energy:
                 self.pos_best = self.position
@@ -3692,10 +3692,10 @@ class SamplerPSO():
             cnt = 0
             selected_molecules = []
             for idx in np.argsort(self.nbr_clashes)[::-1]:
-                if self.sample[idx] and self.nbr_clashes[idx] > 0.:
+                if self.nbr_clashes[idx] > 0.:
                     cnt += 1
                     selected_molecules.append(idx)
-                if cnt > n_individues:
+                if cnt > n_particles:
                     break
 
 #            selected_molecules = np.sort(np.argsort(self.nbr_clashes)[-n_individues:])
@@ -3715,32 +3715,32 @@ class SamplerPSO():
             self._eugenics(positions, mol_ids = selected_molecules)
             positions[0, :] = self._build_position_from_angles(mol_ids = selected_molecules)
             for x0 in positions:
-                swarm.append(self.Particle(x0, inertia, cognitive_cst, social_cst))
+                self.swarm.append(self.Particle(x0, inertia, cognitive_cst, social_cst))
                 
             pos_best_global = None
             lowest_energy_global = np.Inf   
             #set input structure to first structure
-
+            iter_cnt = 0
             while iter_cnt < n_iter:
                 print "iteration:", iter_cnt 
                 t1 = time.time()
                 sorted_population = self._evaluate_swarm(mol_ids = selected_molecules)
                 t2 =  time.time()
                 print "Evaluation time: ", t2-t1
-                best_particle = swarm[sorted_population[0]]
+                best_particle = self.swarm[sorted_population[0]]
                 if best_particle.energy < lowest_energy_global:
                     pos_best_global = best_particle.position
                     lowest_energy_global = best_particle.energy
                 
                 # update velocities and position
-                for particle in swarm:
+                for particle in self.swarm:
                     particle.update_position(pos_best_global)
 
-                gen_cnt += 1 
+                iter_cnt += 1 
                 print "="*70
-            self._build_individue(pos_best_global, mol_ids = selected_molecules)
+            self._build_molecule(pos_best_global, mol_ids = selected_molecules)
             
-    print "Best energy", lowest_energy_global            
+        print "Best energy", lowest_energy_global            
 
 #####################################################################################
 #                                Drawer                                            #
