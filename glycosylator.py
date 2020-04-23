@@ -3184,7 +3184,6 @@ class Sampler():
         sorted_population = self._evaluate_population(clash = clash, fast = fast, mol_ids = selected_molecules)
         self._build_individue(self.population[sorted_population[0]], mol_ids = selected_molecules)
     
-    
 
     def remove_clashes_GA(self, n_generation = 50, pop_size=40, mutation_rate=0.01, crossover_rate=0.9):
         torsionals,n_torsionals = self._get_all_torsional_angles()
@@ -3320,6 +3319,428 @@ class Sampler():
         for e,e1 in self.non_bonded_energy:
             energy += e +  e1
         print "Final energy: ", energy
+
+#####################################################################################
+#                               PSO Sampler                                         #
+#####################################################################################
+class SamplerPSO():
+    """Class to sample conformations, based on a PSO optimization
+    """
+    def __init__(self, molecules, envrionment, dihe_parameters, vdw_parameters, clash_dist = 1.8, grid_resolution = 1.5):
+        """ 
+        Parameters
+            molecules: list of Molecules instances
+            environment: AtomGroup that will not be samples (e.g. protein, membrane, etc.)
+            dihe_parameters: dictionary of parameters for dihedrals from CHARMMParameters. Atomtype as key and [k, n, d] as values
+            vdw_parameters: dictionary of parameters for van der Waals from CHARMMParameters. Atomtype as key and [r, e] as values
+            clash_dist = threshold for defining a clash (A)
+        """
+        self.molecules = molecules
+        self.environment = envrionment
+        self.clash_dist = clash_dist
+        self.cutoff_dist =  10.
+        self.dihe_parameters = dihe_parameters
+        self.energy = {}
+        self.energy_lookup = []
+        self.nbr_clashes = np.zeros(len(self.molecules))
+        self.exclude1_3 = []
+        self.swarm = []
+        #size of environment
+        if self.environment:
+            self.grid_resolution = grid_resolution
+            c = self.environment.select('not resname ASN').getCoords()
+            self.c_min = np.min(c,axis = 0)
+            self.c_max = np.max(c, axis = 0)
+            c_size = np.round((self.c_max - self.c_min)/self.grid_resolution).astype(int)
+            self.bins = [np.linspace(self.c_min[0], self.c_max[0], c_size[0]), np.linspace(self.c_min[1], self.c_max[1], c_size[1]), np.linspace(self.c_min[2], self.c_max[2], c_size[2])]
+            self.environment_grid = np.full(c_size, False)
+            x_idx=np.digitize(c[:, 0], self.bins[0])-1
+            y_idx=np.digitize(c[:, 1], self.bins[1])-1
+            z_idx=np.digitize(c[:, 2], self.bins[2])-1
+            self.environment_grid[(x_idx, y_idx, z_idx)] = True
+        
+        self.parse_patches(os.path.join(GLYCOSYLATOR_PATH,'support/topology/pres.top'))
+        self.interresidue_torsionals = []
+        
+        self.coordinate_idx = np.zeros(len(molecules)+1, dtype=int)
+        self.exclude_nbr_clashes = np.zeros(len(molecules))
+        idx = 0
+#        self.coordinate_idx = int(idx)
+        for mol_id,molecule in enumerate(self.molecules):
+            idx += molecule.atom_group.numAtoms()
+            self.coordinate_idx[mol_id + 1] = idx
+            types = nx.get_node_attributes(molecule.connectivity, 'type')
+            keys = types.keys()
+            keys.sort()
+            
+            self.build_1_3_exclude_list(mol_id)
+            self.count_self_exclude(mol_id)
+
+            self.interresidue_torsionals.append(molecule.get_interresidue_torsionals(self.patches))
+            self.energy['skip'] = self.compute_inv_cum_sum_dihedral([[0.35, 1.0, 0.0]])
+            lookup =[]
+            for dihe in molecule.torsionals:
+                atypes = []
+                for d in dihe:
+                    atypes.append(types[d])
+                k1 = '-'.join(atypes)
+                atypes.reverse()
+                k2 = '-'.join(atypes)
+                if k1 in self.energy:
+                    lookup.append(k1)   
+                    continue
+                if k2 in self.energy:
+                    lookup.append(k2)   
+                    continue
+
+                if k1 in dihe_parameters:
+                    k = k1
+                elif k2 in dihe_parameters:
+                    k = k2
+                else:
+                    print 'Missing parameters for ' + k1
+                    print 'This dihedral will be skipped'
+                    lookup.append('skip')
+                    continue
+                par_list = dihe_parameters[k]
+                self.energy[k] = self.compute_inv_cum_sum_dihedral(par_list)
+                lookup.append(k)
+
+            self.energy_lookup.append(lookup)
+
+        self.molecule_coordinates = np.zeros((idx,3))
+        self.count_total_clashes_fast()
+
+    
+    def compute_inv_cum_sum_dihedral(self, par_list, n_points = 100):
+        """Computes the an interpolation of the inverse transform sampling of a CHARMM
+        dihedral term: sum(k*[1-cos(n*phi -d)]).
+        This allows to map a uniform distribution [0:1[ to the dihedral energy distribution
+        Parameters:
+            par_list: list of parameters [k, n, d] 
+            n_points: number of points used for computing the energy function
+        Returns:
+            inv_cdf: interpolate object
+        """
+        phi = np.linspace(-180., 180., n_points)
+        energy = np.zeros(phi.shape)
+        for p in par_list:
+            k,n,d = p
+            energy += (0.01+k)*(1-np.cos((n*phi -d)*np.pi / 180.))
+        energy = np.max(energy) - energy
+        energy = energy -np.min(energy)
+        energy = energy / np.sum(energy[1:]*np.diff(phi))
+        cum_values = np.zeros(energy.shape)
+        cum_values[1:] = np.cumsum(energy[1:]*np.diff(phi))
+        #plt.plot(cum_values, phi)
+        inv_cdf = interp1d(cum_values, phi, fill_value="extrapolate")
+        return inv_cdf
+    
+    def parse_patches(self, fname):
+        lines  = readLinesFromFile(fname)
+        self.patches = defaultdict(list) 
+        for line in lines:
+            line = line.split('\n')[0].split('!')[0].split() #remove comments and endl
+            if line:
+                if line[0]=='PRES':
+                    patch = line[1]
+                if line[0]=='DIHE':
+                    dihe = [line[1:5], list(pairwise(map(float, line[5:])))] 
+                    self.patches[patch].append(dihe) 
+
+    def get_uniform(self, interp_fn, angle):
+        """Returns a number between [0:1[ which corresponds to an angle, 
+        based on the distribution of angle energy.
+        Parameters:
+            inter_fn: interpolate object
+            angle: angle in degrees
+
+        Return:
+            root: number between [0:1[
+        """
+        if angle > 180:
+            angle -=180
+        interp_fn2 = lambda x: interp_fn(x) - angle
+        r = optimize.root(interp_fn2, .5, method = 'lm')
+        return r.x[0]
+
+    def build_1_3_exclude_list(self, mol_id):
+        """list with set of neighboring atoms
+        """
+        molecule = self.molecules[mol_id]
+        G = molecule.connectivity
+        exclude_mol = []
+        for a in sorted(G.nodes()):
+            exclude = set()
+            for n in G.neighbors(a):
+                exclude.add(n)
+                exclude.update(G.neighbors(n))
+            exclude_mol.append(exclude)
+        self.exclude1_3.append(exclude_mol)
+    
+    def count_self_exclude(self, mol_id):
+        """Counts the number bonds and 1_3 exclusion for each molecule
+        KDTree based
+        Parameters:
+            mol_id: id of molecule to consider 
+            increment: should the overwrite or update nbr_clashes
+        Returns
+            nbr_clashes: the number of clashes
+        """
+        molecule = self.molecules[mol_id]
+        kd = KDTree(molecule.atom_group.getCoords())
+        kd.search(self.clash_dist)
+        atoms = kd.getIndices()
+        exclude_mol = self.exclude1_3[mol_id]
+        c = 0
+        for a1,a2 in atoms:
+            if a1+1 in exclude_mol[a2]:
+                c += 1
+        self.exclude_nbr_clashes[mol_id] = c       
+
+    def count_total_clashes_fast(self):
+        for i,molecule in enumerate(self.molecules):
+            i0,i1 = self.coordinate_idx[i:i+2]
+            self.molecule_coordinates[i0:i1, :] = molecule.atom_group.getCoords()
+        self.count_clashes_fast()
+        self.count_environment_clashes_grid()
+
+    def count_clashes_fast(self):
+        """ Counts all the clashes for molecules at ones. KDTree == (nbr_clashes + nbr_bonds). 
+        Since nbr_bonds is constant, it is not required to recount them each time.
+        """
+        kd = KDTree(self.molecule_coordinates)
+        kd.search(self.clash_dist)
+        atoms = kd.getIndices().flatten()
+        self.nbr_clashes = np.histogram(atoms, self.coordinate_idx)[0]/2 - self.exclude_nbr_clashes 
+        
+    def count_environment_clashes_grid(self):
+        if self.environment: 
+            idx = np.all(np.logical_and(self.molecule_coordinates >= self.c_min[np.newaxis,:], self.molecule_coordinates <= self.c_max[np.newaxis,:]), axis = 1)
+            counts = np.zeros(idx.shape)
+            if np.sum(idx)>0:
+                x_idx = np.digitize(self.molecule_coordinates[idx, 0], self.bins[0])-1
+                y_idx = np.digitize(self.molecule_coordinates[idx, 1], self.bins[1])-1
+                z_idx = np.digitize(self.molecule_coordinates[idx, 2], self.bins[2])-1
+                counts[idx] = self.environment_grid[x_idx, y_idx, z_idx]
+                self.nbr_clashes += np.histogram(np.argwhere(counts), self.coordinate_idx)[0]
+                
+    def _get_all_torsional_angles(self):
+        """Measures and returns all the torsional angle in molecules
+        """
+        angles = []
+        n_torsionals = []
+        for molecule in self.molecules:
+            a = molecule.get_all_torsional_angles()
+            n_torsionals.append(len(a))
+            angles += a
+        return angles,n_torsionals
+
+    def _build_position_from_angles(self, mol_ids = []):
+        """Generate the position of a particle based on the torsional angles present in molecules
+        """
+        if not len(mol_ids):
+            mol_ids = np.arange(len(self.molecules))
+        i = 0
+        #set torsional angles
+        position = []
+        for mol_id in mol_ids:
+            molecule = self.molecules[mol_id]
+            torsionals = molecule.get_all_torsional_angles()
+            thetas = []
+            t_id = 0
+            for t in torsionals:
+                e = self.energy_lookup[mol_id][t_id]
+                position.append(self.get_uniform(self.energy[e], t))
+                t_id += 1
+            mol_id += 1
+        return position
+    
+    def _build_molecule(self, position, mol_ids = []):
+        """Builds and sets torsionals angles of molecules, based on the position of a particle
+        Parameter:
+            position: list of corresponding to the position of a particle
+        """
+        #set torsional angles
+        if not len(mol_ids):
+            mol_ids = np.arange(len(self.molecules))
+        i = 0
+        for mol_id in mol_ids:
+            molecule = self.molecules[mol_id]
+            n = len(molecule.torsionals)
+            torsionals = position[i:i+n]
+            thetas = []
+            for t_id,t in enumerate(torsionals):
+                e = self.energy_lookup[mol_id][t_id]
+                thetas.append(self.energy[e](t))
+                #thetas.append(t*360)
+            molecule.set_torsional_angles(molecule.torsionals, thetas, absolute = True)
+            i += n
+
+    def _evaluate_swarm(self, mol_ids = []):
+        """Evaluates the fittnest of the swar,:
+        Parameters:
+            mol_ids: only consider subgroup of molecules with index
+        """
+        energies = []
+        t_build = []
+        t_energy = []
+        for p in self.swarm:
+            t_1 = time.time()
+            self._build_molecule(p.position, mol_ids)
+            t_build.append(time.time()-t_1)
+            #evaluate energy
+            mol_id = 0
+            energy = 0
+            t_1 = time.time()
+            self.count_total_clashes_fast()
+            p.update_energy(np.sum(self.nbr_clashes))
+            energies.append(p.energy)
+            t_energy.append(time.time()-t_1)
+        print "Average build time: ", np.mean(t_build)
+        print "Average evaluation time: ", np.mean(t_energy)
+        ee = np.argsort(energies)
+        print "Best energy: ", '%e' % energies[ee[0]], "|| Median energy: ", '%e' % np.median(energies), "|| Worst energy: ", '%e' % energies[ee[-1]]
+        return ee
+
+        def _eugenics(self, positions, percentage_of_positions = .75, mol_ids = []):
+        """Uses a set of predefined angles to bias the sampled torsional angles. torsional angles defined in pres.top will be biased
+        Parameters:
+            percentage_of_positions: percent of the total population that should be biased
+        """
+        if not len(mol_ids):
+            mol_ids = np.arange(len(self.molecules))
+        i = 0
+        
+        size = int(positions.shape[0] * percentage_of_positions)
+        for mol_id in mol_ids:
+            molecule = self.molecules[mol_id]
+            interresidue = self.interresidue_torsionals[mol_id]
+            n = len(molecule.torsionals)
+            torsionals = positions[:, i:i+n]
+            for torsional_ids in interresidue.keys():
+                p_id,deltas = interresidue[torsional_ids]
+                patch = self.patches[p_id]
+                n = len(patch[0][1])
+                preferred_angles = np.random.randint(n, size = size)
+                #preferred_angles = self.gmm[p_id].sample(size)
+                for p,t_id in zip(patch, map(int, torsional_ids.split('-'))):
+                    e = self.energy_lookup[mol_id][t_id]
+                    angles = []
+                    torsional = []
+                    for p_angle in preferred_angles:
+                        t1 = self.get_uniform(self.energy[e], p[1][p_angle][0])
+                        t2 = self.get_uniform(self.energy[e], p[1][p_angle][1])
+                        torsional.append(np.random.uniform(t1, t2))
+                    
+                    torsionals[:size, t_id] = torsional
+
+    class Particle:
+        """ This class implements the functions needed for taking care of the Particles
+            Parameters:
+                position: position of the particle [0;1]
+                velocity: velocity of the particle [-1;1]
+                pos_best: position of the best energy
+                lowest_energy: lowest energy of the particle
+                energy: current energy of the particle
+        """
+        def __init__(self, x0, inertia = 0.05, cognitive_cst = 0.1, social_cst = 0.2):
+            self.position = x0          							  # particle position
+            self.velocity = 2*np.random.rand(x0.shape[0])-1           # particle velocity
+            self.pos_best = []										  # best position individual
+            self.lowest_energy = np.Inf 							  # lowest energy individual
+            self.energy = np.Inf        							  # current energy individual
+            self.w = inertia            							  # inertia constant
+            self.c1 = cognitive_cst     							  # cognitive constant
+            self.c2 = social_cst        							  # social constant   
+      
+        def update_energy(self, energy):
+        	self.energy = energy
+            # check to see if the current position is an individual best
+            if self.energy < self.lowest_energy:
+                self.pos_best = self.position
+                self.lowest_energy =self.energy
+
+        # update new particle velocity
+        def update_velocity(self, pos_best_global):
+            r1, r2 = np.random.rand(2, self.position.shape[0])
+            vel_cognitive = self.c1 * r1 * (self.pos_best - self.position)
+            vel_social = self.c2 * r2 * (pos_best_global - self.position)
+            self.velocity = self.w * self.velocity + vel_cognitive + vel_social
+
+        # update the particle position
+        def update_position(self, pos_best_global):
+            self.update_velocity(pos_best_global)
+            self.position = self.position + self.velocity
+            #check bounds and reflect particle
+            idx = self.position >= 1.
+            self.position[idx] = 1.
+            self.velocity[idx] = -1.*self.velocity[idx]
+            idx = self.position <= 0
+            self.position[idx] = 0
+            self.velocity[idx] = -1.*self.velocity[idx]
+
+
+    
+    def remove_clashes_PSO(self, n_generation, n_molecules, n_particles, n_iter, inertia = 0.05, cognitive_cst = 0.1, social_cst = 0.2):
+
+        n_molecules =  np.min((n_molecules, len(self.molecules)))
+        
+        for gen_cnt in np.arange(n_generation):
+            #Select molecules with highest number of clashes
+            print "Generation", gen_cnt
+            cnt = 0
+            selected_molecules = []
+            for idx in np.argsort(self.nbr_clashes)[::-1]:
+                if self.sample[idx] and self.nbr_clashes[idx] > 0.:
+                    cnt += 1
+                    selected_molecules.append(idx)
+                if cnt > n_individues:
+                    break
+
+#            selected_molecules = np.sort(np.argsort(self.nbr_clashes)[-n_individues:])
+            selected_molecules = np.sort(selected_molecules)
+            print "Selected Molecules", selected_molecules
+            torsionals = []
+            n_torsionals = []
+            for mol_id in selected_molecules:
+                a = self.molecules[mol_id].get_all_torsional_angles()
+                n_torsionals.append(len(a))
+                torsionals += a
+
+            length = len(torsionals)
+            # Build the swarm
+            self.swarm = []
+            positions = np.random.rand(n_particles, length)
+            self._eugenics(positions, mol_ids = selected_molecules)
+            positions[0, :] = self._build_position_from_angles(mol_ids = selected_molecules)
+            for x0 in positions:
+                swarm.append(self.Particle(x0, inertia, cognitive_cst, social_cst))
+                
+            pos_best_global = None
+            lowest_energy_global = np.Inf   
+            #set input structure to first structure
+
+            while iter_cnt < n_iter:
+                print "iteration:", iter_cnt 
+                t1 = time.time()
+                sorted_population = self._evaluate_swarm(mol_ids = selected_molecules)
+                t2 =  time.time()
+                print "Evaluation time: ", t2-t1
+                best_particle = swarm[sorted_population[0]]
+                if best_particle.energy < lowest_energy_global:
+                    pos_best_global = best_particle.position
+                    lowest_energy_global = best_particle.energy
+                
+                # update velocities and position
+                for particle in swarm:
+                    particle.update_position(pos_best_global)
+
+                gen_cnt += 1 
+                print "="*70
+            self._build_individue(pos_best_global, mol_ids = selected_molecules)
+            
+    print "Best energy", lowest_energy_global            
 
 #####################################################################################
 #                                Drawer                                            #
