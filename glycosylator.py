@@ -31,9 +31,9 @@ from prody import *
 from itertools import izip
 from collections import defaultdict
 from scipy.spatial import distance
-from scipy.interpolate import interp1d
-from scipy.optimize import minimize, newton
-from scipy import optimize 
+#from scipy.interpolate import interp1d
+from scipy.interpolate import InterpolatedUnivariateSpline
+#from scipy import optimize 
 import random
 from operator import itemgetter
 import sqlite3
@@ -2623,7 +2623,12 @@ class Sampler():
         cum_values = np.zeros(energy.shape)
         cum_values[1:] = np.cumsum(energy[1:]*np.diff(phi))
         #plt.plot(cum_values, phi)
-        inv_cdf = interp1d(cum_values, phi, fill_value="extrapolate")
+        #  x has to be strickly increasing
+        idx = np.full(cum_values.size, True)
+        idx[1:] = np.diff(cum_values) > 0.0
+        x = cum_values[idx]
+        y = phi[idx]
+        inv_cdf = InterpolatedUnivariateSpline(x, y)
         return inv_cdf
     
     def parse_patches(self, fname):
@@ -2649,10 +2654,15 @@ class Sampler():
             root: number between [0:1[
         """
         if angle > 180:
-            angle -=180
-        interp_fn2 = lambda x: interp_fn(x) - angle
-        r = optimize.root(interp_fn2, .5, method = 'lm')
-        return r.x[0]
+            angle = 180 - angle
+        x = np.linspace(0, 1, 10)
+        y = [interp_fn(i) - angle for i in x]
+        spl = InterpolatedUnivariateSpline(x, y)
+        r = spl.roots()
+        if not r:
+            return 1.
+        else:
+            return r[0]
 
     def build_1_3_exclude_list(self, mol_id):
         """list with set of neighboring atoms
@@ -2937,6 +2947,9 @@ class Sampler():
             t_id = 0
             for t in torsionals:
                 e = self.energy_lookup[mol_id][t_id]
+                #if t < 0:
+                #    t += 360.
+                #individue.append(t/360.)
                 individue.append(self.get_uniform(self.energy[e], t))
                 t_id += 1
             mol_id += 1
@@ -3155,7 +3168,7 @@ class Sampler():
 
             length = len(torsionals)
             self.population = np.random.rand(pop_size, length)
-            self._eugenics(mol_ids = selected_molecules)
+            #self._eugenics(mol_ids = selected_molecules)
             #set input structure to first structure
             self.population[0, :] = self._build_individue_from_angles(mol_ids = selected_molecules)
             gen_cnt = 0
@@ -3432,8 +3445,14 @@ class SamplerPSO():
         energy = energy / np.sum(energy[1:]*np.diff(phi))
         cum_values = np.zeros(energy.shape)
         cum_values[1:] = np.cumsum(energy[1:]*np.diff(phi))
+
         #plt.plot(cum_values, phi)
-        inv_cdf = interp1d(cum_values, phi, fill_value="extrapolate")
+        idx = np.full(cum_values.size, True)
+        idx[1:] = np.diff(cum_values) > 0.0
+        x = cum_values[idx]
+        y = phi[idx]
+
+        inv_cdf = InterpolatedUnivariateSpline(x, y)
         return inv_cdf
     
     def parse_patches(self, fname):
@@ -3459,10 +3478,15 @@ class SamplerPSO():
             root: number between [0:1[
         """
         if angle > 180:
-            angle -=180
-        interp_fn2 = lambda x: interp_fn(x) - angle
-        r = optimize.root(interp_fn2, .5, method = 'lm')
-        return r.x[0]
+            angle = 180 - angle
+        x = np.linspace(0, 1, 10)
+        y = [interp_fn(i) - angle for i in x]
+        spl = InterpolatedUnivariateSpline(x, y)
+        r = spl.roots()
+        if not r:
+            return 1.
+        else:
+            return r[0]
 
     def build_1_3_exclude_list(self, mol_id):
         """list with set of neighboring atoms
@@ -3551,6 +3575,9 @@ class SamplerPSO():
             t_id = 0
             for t in torsionals:
                 e = self.energy_lookup[mol_id][t_id]
+                #if t < 0.:
+                #    t += 360
+                #position.append(t/360.)
                 position.append(self.get_uniform(self.energy[e], t))
                 t_id += 1
             mol_id += 1
@@ -3587,11 +3614,12 @@ class SamplerPSO():
         t_energy = []
         for p in self.swarm:
             t_1 = time.time()
+            #DEBUG
+            #e = np.sum(p.position*p.position)
+            #p.update_energy(e)
+            #energies.append(e)
             self._build_molecule(p.position, mol_ids)
             t_build.append(time.time()-t_1)
-            #evaluate energy
-            mol_id = 0
-            energy = 0
             t_1 = time.time()
             self.count_total_clashes_fast()
             p.update_energy(np.sum(self.nbr_clashes))
@@ -3644,15 +3672,15 @@ class SamplerPSO():
                 lowest_energy: lowest energy of the particle
                 energy: current energy of the particle
         """
-        def __init__(self, x0, inertia = 0.05, cognitive_cst = 0.1, social_cst = 0.2):
+        def __init__(self, x0, inertia = 0.75, cognitive_prm = 1.75, social_prm = 2.):
             self.position = x0                                        # particle position
             self.velocity = 2*np.random.rand(x0.shape[0])-1           # particle velocity
             self.pos_best = []                                          # best position individual
             self.lowest_energy = np.Inf                               # lowest energy individual
             self.energy = np.Inf                                      # current energy individual
             self.w = inertia                                          # inertia constant
-            self.c1 = cognitive_cst                                   # cognitive constant
-            self.c2 = social_cst                                      # social constant   
+            self.c1 = cognitive_prm                                   # cognitive parameter 
+            self.c2 = social_prm                                      # social parameter  
       
         def update_energy(self, energy):
             self.energy = energy
@@ -3663,11 +3691,12 @@ class SamplerPSO():
 
         # update new particle velocity
         def update_velocity(self, pos_best_global):
-            r1, r2 = np.random.rand(2, self.position.shape[0])
+            r1, r2 = np.random.rand(2)
+            #r1, r2 = np.random.rand(2, self.position.shape[0])
             vel_cognitive = self.c1 * r1 * (self.pos_best - self.position)
             vel_social = self.c2 * r2 * (pos_best_global - self.position)
             self.velocity = self.w * self.velocity + vel_cognitive + vel_social
-
+            
         # update the particle position
         def update_position(self, pos_best_global):
             self.update_velocity(pos_best_global)
@@ -3675,14 +3704,14 @@ class SamplerPSO():
             #check bounds and reflect particle
             idx = self.position >= 1.
             self.position[idx] = 1.
-            self.velocity[idx] = -1.*self.velocity[idx]
+            self.velocity[idx] = -.1*self.velocity[idx]
             idx = self.position <= 0
             self.position[idx] = 0
-            self.velocity[idx] = -1.*self.velocity[idx]
+            self.velocity[idx] = -.1*self.velocity[idx]
 
 
     
-    def remove_clashes_PSO(self, n_generation, n_molecules, n_particles, n_iter, inertia = 0.05, cognitive_cst = 0.1, social_cst = 0.2):
+    def remove_clashes_PSO(self, n_generation, n_molecules, n_particles, n_iter, inertia = .75, cognitive_prm = 1.5, social_prm = 2.): 
 
         n_molecules =  np.min((n_molecules, len(self.molecules)))
         
@@ -3695,7 +3724,7 @@ class SamplerPSO():
                 if self.nbr_clashes[idx] > 0.:
                     cnt += 1
                     selected_molecules.append(idx)
-                if cnt > n_particles:
+                if cnt > n_molecules:
                     break
 
 #            selected_molecules = np.sort(np.argsort(self.nbr_clashes)[-n_individues:])
@@ -3712,30 +3741,30 @@ class SamplerPSO():
             # Build the swarm
             self.swarm = []
             positions = np.random.rand(n_particles, length)
-            self._eugenics(positions, mol_ids = selected_molecules)
+            #self._eugenics(positions, mol_ids = selected_molecules)
             positions[0, :] = self._build_position_from_angles(mol_ids = selected_molecules)
             for x0 in positions:
-                self.swarm.append(self.Particle(x0, inertia, cognitive_cst, social_cst))
+                self.swarm.append(self.Particle(x0, inertia, cognitive_prm, social_prm))
                 
             pos_best_global = None
             lowest_energy_global = np.Inf   
             #set input structure to first structure
             iter_cnt = 0
             while iter_cnt < n_iter:
-                print "iteration:", iter_cnt 
+                print "Iteration:", iter_cnt 
                 t1 = time.time()
                 sorted_population = self._evaluate_swarm(mol_ids = selected_molecules)
                 t2 =  time.time()
-                print "Evaluation time: ", t2-t1
+                print "Total time for one iteration: ", t2-t1
                 best_particle = self.swarm[sorted_population[0]]
                 if best_particle.energy < lowest_energy_global:
                     pos_best_global = best_particle.position
                     lowest_energy_global = best_particle.energy
                 
                 # update velocities and position
+                max_vel = 0
                 for particle in self.swarm:
                     particle.update_position(pos_best_global)
-
                 iter_cnt += 1 
                 print "="*70
             self._build_molecule(pos_best_global, mol_ids = selected_molecules)
