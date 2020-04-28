@@ -3189,8 +3189,6 @@ class Sampler():
                 print "New population time: ", t2-t1
                 gen_cnt += 1 
                 print "="*70
-    #            if i > n_generation/3:
-    #                self._immortalize_fittest()
             sorted_population = self._evaluate_population(clash = clash, fast = fast, mol_ids = selected_molecules)
             self._build_individue(self.population[sorted_population[0]], mol_ids = selected_molecules)
     
@@ -3245,93 +3243,8 @@ class Sampler():
             print "New population time: ", t2-t1
             i += 1 
             print "="*70
-#            if i > n_generation/3:
-#                self._immortalize_fittest()
         sorted_population = self._evaluate_population(clash = clash, fast = fast)
         self._build_individue(self.population[sorted_population[0]])
-        
-
-    def remove_clashes(self, temp = 150, n = 1000, max_torsional = 0.3):
-        """Monte Carlo sampling to remove clashes. The number of torsional anlges will decrease for max_torsional (fractions of total angles)
-        to one single angle.
-        Parameters:
-            temp: temperature for 
-            n: number of cycles
-            max_torsional: maximal fractions of trosional angles that will be sampled.
-        """
-        R      = 1.9872156e-3    # Gas constant  kcal/mol/degree
-        beta   = 1 / ( R * temp)
-        
-        i = 0
-        i_skipped = 0
-
-        n_mol = len(self.molecules)
-        energy = 0
-        for e,e2 in self.non_bonded_energy:
-            energy += e+e2 
-        print "Initial energy: ", energy
-        while i < n:
-            #mol_id = np.random.randint(n_mol)
-            #look for highest energy glycans
-            idx = np.argsort(np.sum(self.non_bonded_energy, axis = 1))
-            mol_id = idx[-(np.random.randint(3)+1)]
-            #mol_id = 14
-            print '#', mol_id, self.non_bonded_energy[mol_id], '#'
-            energy_self,energy =  self.non_bonded_energy[mol_id]
-            torsionals = self.molecules[mol_id].torsionals
-            nbr_torsionals = np.max([1,int(max_torsional * len(torsionals))])
-            nbr_torsionals = 1
-            max_torsional -= max_torsional/n 
-            t_ids  = np.random.randint(len(torsionals), size = nbr_torsionals)
-            r_s = np.random.random_sample((nbr_torsionals,))
-            lenergy = []
-            
-            if not len(t_ids):
-                # if more than five variable were skipped i should increase, in order to avoid infinit loop
-                if i_skipped == 5:
-                    i_skipped = 0
-                    i += 1
-                else:
-                    i_skipped += 1
-                continue
-
-            for t_id in t_ids:
-                e = self.energy_lookup[mol_id][t_id]
-                if e == 'skip':
-                    break
-                lenergy.append(e)
-            if e == 'skip':
-                continue
-            i += 1
-            dtheta = []
-            atom_group_copy = self.molecules[mol_id].atom_group.copy()
-            for e,r,t_id in zip(lenergy, r_s, t_ids):
-                theta = self.energy[e](r)
-                self.molecules[mol_id].rotate_bond(int(t_id), theta, absolute = True)
-                #theta = (-1 + 2*np.random.randint(1))*np.random.uniform(5., 10.)
-                self.molecules[mol_id].rotate_bond(int(t_id), theta, absolute = False)
-            energy_self_new,energy_new = self.compute_total_energy(mol_id)
-
-            #print clashes_new,clashes
-            if energy_new >= energy or energy_self_new >= energy_self:
-                if energy_new > 1e5 or energy_self_new > 1e5:
-                    e = -1 
-                    e_self = -1
-                else:
-                    e_self = np.exp( -beta *(energy_self_new - energy_self) )
-                    e = np.exp( -beta *(energy_new - energy) )
-                r = np.random.random_sample()
-                r_self = np.random.random_sample()
-                if (e < r) or (e_self < r_self):
-                    # set back initial configuration
-                    self.molecules[mol_id].atom_group = atom_group_copy
-                    continue
-            self.non_bonded_energy[mol_id] = [energy_self_new, energy_new]
-
-        energy = 0 
-        for e,e1 in self.non_bonded_energy:
-            energy += e +  e1
-        print "Final energy: ", energy
 
 #####################################################################################
 #                               PSO Sampler                                         #
@@ -3548,6 +3461,28 @@ class SamplerPSO():
                 z_idx = np.digitize(self.molecule_coordinates[idx, 2], self.bins[2])-1
                 counts[idx] = self.environment_grid[x_idx, y_idx, z_idx]
                 self.nbr_clashes += np.histogram(np.argwhere(counts), self.coordinate_idx)[0]
+    
+    def count_self_clashes(self, mol_id):
+        """Counts the number of clashes for a molecule
+        KDTree based
+        Parameters:
+            mol_id: id of molecule to consider 
+            increment: should the overwrite or update nbr_clashes
+        Returns
+            nbr_clashes: the number of clashes
+        """
+        molecule = self.molecules[mol_id]
+        kd = KDTree(molecule.atom_group.getCoords())
+        kd.search(self.clash_dist)
+        atoms = kd.getIndices()
+        distances = kd.getDistances()
+        G = molecule.connectivity
+        nbr_clashes = 0
+        exclude_mol = self.exclude1_3[mol_id]
+        for ((a1,a2), d) in zip(atoms, distances):
+            if a1+1 not in exclude_mol[a2]:
+                nbr_clashes += 1.
+        return nbr_clashes
                 
     def _get_all_torsional_angles(self):
         """Measures and returns all the torsional angle in molecules
@@ -3575,9 +3510,6 @@ class SamplerPSO():
             t_id = 0
             for t in torsionals:
                 e = self.energy_lookup[mol_id][t_id]
-                #if t < 0.:
-                #    t += 360
-                #position.append(t/360.)
                 position.append(self.get_uniform(self.energy[e], t))
                 t_id += 1
             mol_id += 1
@@ -3600,7 +3532,6 @@ class SamplerPSO():
             for t_id,t in enumerate(torsionals):
                 e = self.energy_lookup[mol_id][t_id]
                 thetas.append(self.energy[e](t))
-                #thetas.append(t*360)
             molecule.set_torsional_angles(molecule.torsionals, thetas, absolute = True)
             i += n
 
@@ -3614,10 +3545,6 @@ class SamplerPSO():
         t_energy = []
         for p in self.swarm:
             t_1 = time.time()
-            #DEBUG
-            #e = np.sum(p.position*p.position)
-            #p.update_energy(e)
-            #energies.append(e)
             self._build_molecule(p.position, mol_ids)
             t_build.append(time.time()-t_1)
             t_1 = time.time()
@@ -3630,38 +3557,6 @@ class SamplerPSO():
         ee = np.argsort(energies)
         print "Best energy: ", '%e' % energies[ee[0]], "|| Median energy: ", '%e' % np.median(energies), "|| Worst energy: ", '%e' % energies[ee[-1]]
         return ee
-
-    def _eugenics(self, positions, percentage_of_positions = .75, mol_ids = []):
-        """Uses a set of predefined angles to bias the sampled torsional angles. torsional angles defined in pres.top will be biased
-        Parameters:
-            percentage_of_positions: percent of the total population that should be biased
-        """
-        if not len(mol_ids):
-            mol_ids = np.arange(len(self.molecules))
-        i = 0
-        
-        size = int(positions.shape[0] * percentage_of_positions)
-        for mol_id in mol_ids:
-            molecule = self.molecules[mol_id]
-            interresidue = self.interresidue_torsionals[mol_id]
-            n = len(molecule.torsionals)
-            torsionals = positions[:, i:i+n]
-            for torsional_ids in interresidue.keys():
-                p_id,deltas = interresidue[torsional_ids]
-                patch = self.patches[p_id]
-                n = len(patch[0][1])
-                preferred_angles = np.random.randint(n, size = size)
-                #preferred_angles = self.gmm[p_id].sample(size)
-                for p,t_id in zip(patch, map(int, torsional_ids.split('-'))):
-                    e = self.energy_lookup[mol_id][t_id]
-                    angles = []
-                    torsional = []
-                    for p_angle in preferred_angles:
-                        t1 = self.get_uniform(self.energy[e], p[1][p_angle][0])
-                        t2 = self.get_uniform(self.energy[e], p[1][p_angle][1])
-                        torsional.append(np.random.uniform(t1, t2))
-                    
-                    torsionals[:size, t_id] = torsional
 
     class Particle:
         """ This class implements the functions needed for taking care of the Particles
@@ -3692,7 +3587,6 @@ class SamplerPSO():
         # update new particle velocity
         def update_velocity(self, pos_best_global):
             r1, r2 = np.random.rand(2)
-            #r1, r2 = np.random.rand(2, self.position.shape[0])
             vel_cognitive = self.c1 * r1 * (self.pos_best - self.position)
             vel_social = self.c2 * r2 * (pos_best_global - self.position)
             self.velocity = self.w * self.velocity + vel_cognitive + vel_social
@@ -3711,10 +3605,19 @@ class SamplerPSO():
 
 
     
-    def remove_clashes_PSO(self, n_generation, n_molecules, n_particles, n_iter, inertia = .75, cognitive_prm = 1.5, social_prm = 2.): 
+    def remove_clashes_PSO(self, n_generation, n_molecules, n_particles, n_iter, inertia = .75, cognitive_prm = 1.5, social_prm = 2., save_trajectory=False):
 
         n_molecules =  np.min((n_molecules, len(self.molecules)))
-        
+
+        if save_trajectory:
+            natoms = 0
+            for i,m in enumerate(self.molecules):
+                if i:
+                    molecule_trajectory += m.atom_group
+                else:
+                    molecule_trajectory = m.atom_group
+                natoms += m.atom_group.numAtoms()
+
         for gen_cnt in np.arange(n_generation):
             #Select molecules with highest number of clashes
             print "Generation", gen_cnt
@@ -3727,7 +3630,6 @@ class SamplerPSO():
                 if cnt > n_molecules:
                     break
 
-#            selected_molecules = np.sort(np.argsort(self.nbr_clashes)[-n_individues:])
             selected_molecules = np.sort(selected_molecules)
             print "Selected Molecules", selected_molecules
             torsionals = []
@@ -3741,7 +3643,6 @@ class SamplerPSO():
             # Build the swarm
             self.swarm = []
             positions = np.random.rand(n_particles, length)
-            #self._eugenics(positions, mol_ids = selected_molecules)
             positions[0, :] = self._build_position_from_angles(mol_ids = selected_molecules)
             for x0 in positions:
                 self.swarm.append(self.Particle(x0, inertia, cognitive_prm, social_prm))
@@ -3750,6 +3651,7 @@ class SamplerPSO():
             lowest_energy_global = np.Inf   
             #set input structure to first structure
             iter_cnt = 0
+
             while iter_cnt < n_iter:
                 print "Iteration:", iter_cnt 
                 t1 = time.time()
@@ -3760,6 +3662,17 @@ class SamplerPSO():
                 if best_particle.energy < lowest_energy_global:
                     pos_best_global = best_particle.position
                     lowest_energy_global = best_particle.energy
+                    if save_trajectory:
+                        self._build_molecule(pos_best_global, mol_ids = selected_molecules)
+                        coords = np.zeros((natoms, 3))
+                        i = 0
+                        j = 0
+                        for m in self.molecules:
+                            j  = i + m.atom_group.numAtoms()
+                            coords[i:j, :] = m.atom_group.getCoords()
+                            i = j
+                        molecule_trajectory.addCoordset(coords)
+
                 
                 # update velocities and position
                 max_vel = 0
@@ -3770,6 +3683,8 @@ class SamplerPSO():
             self._build_molecule(pos_best_global, mol_ids = selected_molecules)
             
         print "Best energy", lowest_energy_global            
+        if save_trajectory:
+            writePDB('PSO_trajectory.pdb', molecule_trajectory)
 
 #####################################################################################
 #                                Drawer                                            #
