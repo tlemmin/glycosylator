@@ -1,0 +1,42 @@
+RESI FA2								
+UNIT	NAG							
+UNIT	NAG	C1	14bb					
+UNIT	FUC	C1	16bb					
+UNIT	BMA	C1	14bb	14bb				
+UNIT	MAN	C1	14bb	14bb	16ab			
+UNIT	MAN	C1	14bb	14bb	13ab			
+UNIT	NAG	C1	14bb	14bb	16ab	12ba		
+UNIT	NAG	C1	14bb	14bb	13ab	12ba		
+								
+RESI FA3								
+UNIT	NAG							
+UNIT	NAG	C1	14bb					
+UNIT	FUC	C1	16bb					
+UNIT	BMA	C1	14bb	14bb				
+UNIT	MAN	C1	14bb	14bb	16ab			
+UNIT	MAN	C1	14bb	14bb	13ab			
+UNIT	NAG	C1	14bb	14bb	16ab	12ba		
+UNIT	NAG	C1	14bb	14bb	13ab	12ba		
+UNIT	NAG	C1	14bb	14bb	16ab	16bb	
+								
+RESI M5								
+UNIT	NAG							!Z1
+UNIT	NAG	C1	14bb					!Z2
+UNIT	BMA	C1	14bb	14bb				!Z3
+UNIT	MAN	C1	14bb	14bb	16ab			!Z4
+UNIT	MAN	C1	14bb	14bb	16ab	16ab		!Z5
+UNIT	MAN	C1	14bb	14bb	16ab	13ab		!Z7
+UNIT	MAN	C1	14bb	14bb	13ab			!Z9
+								
+RESI M9								
+UNIT	NAG							            !Z1
+UNIT	NAG	C1	14bb					            !Z2
+UNIT	BMA	C1	14bb	14bb				!Z3
+UNIT	MAN	C1	14bb	14bb	16ab			!Z4
+UNIT	MAN	C1	14bb	14bb	16ab	16ab		!Z5
+UNIT	MAN	C1	14bb	14bb	16ab	16ab	12aa	!Z6
+UNIT	MAN	C1	14bb	14bb	16ab	13ab		!Z7
+UNIT	MAN	C1	14bb	14bb	16ab	13ab	12aa	!Z8
+UNIT	MAN	C1	14bb	14bb	13ab			!Z9
+UNIT	MAN	C1	14bb	14bb	13ab	12aa		!Z10
+UNIT	MAN	C1	14bb	14bb	13ab	12aa	12aa	!Z11
