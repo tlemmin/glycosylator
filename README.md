@@ -10,6 +10,9 @@ conformations. Glycosylator can also identify specific 3D glycans on a protein s
 using a library of predefined templates.
 Glycosylator has been implemented in a generic way allowing the user to expand the library to incorporate other polymers.
 
+Please cite:
+https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-019-3097-6
+
 ## Computing Environment
 Glycosylator was developed with the following packages:
 ```
