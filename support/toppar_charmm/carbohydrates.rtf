@@ -713,18 +713,41 @@ IMPR 1ND2  1CG  2C1  1HD22  !
 
 
 !    I     J    K    L      R(IK)   T(IKJ)    PHI   T(JKL)   R(KL)
-!IC   1CB   1CG  1ND2  2C1     1.4000  120.00  180.00  120.00   1.4000
-!IC   1CG   1ND2 2C1   2O5     1.4000  120.00 -120.00  120.00   1.4000
-!IC   1HD22 1ND2 2C1   2O5     1.4000  120.00    0.00  120.00   1.4000
-!IC   2C5   2O5  2C1   2H1     1.4773  111.49   60.14  108.74   1.0555
-!IC   1ND2  2C1  2O5   2C5     1.4000  120.00  180.00  120.00   1.4000
-
 !Thermalized
 IC   1CB   1CG  1ND2  2C1         1.5479  118.86 -175.68  128.70   1.3783
 IC   1CG   1ND2 2C1   2O5         1.3126  128.70  -70.91  104.39   1.4413
 IC   1HD22 1ND2 2C1   2O5         1.0117  111.10  108.04  104.39   1.4413
 IC   2C5   2O5  2C1   2H1         1.4242  116.13   41.53  110.40   1.1136
 IC   1ND2  2C1  2O5   2C5         1.3783  104.39  165.66  116.13   1.4242
+
+PRES WGPA           -0.07 ! for connecting TRP to Sugar
+dele atom 1HD1 !     |                  HE3
+dele atom 2O1  !  HN-N                   |
+dele atom 2HO1 !     |   HB1            CE3
+               !     |   |             /  \\
+               !  HA-CA--CB---CG-----CD2   CZ3-HZ3
+               !     |   |    ||     ||     |
+               !     |   HB2  CD1    CE2   CH2-HH2
+               !   O=C       /   \   / \  //
+               !     |    Sugar   NE1   CZ2
+               !                   |     |
+               !                  HE1   HZ2
+               
+               
+GROUP
+! WARNING THE ATOM TYPE AND CHARGES HAVE NOT BEEN OPTIMIZED FOR MOLECULAR DYNAMICS
+ATOM 1CD1  CA       -0.07     !Charge assigned by adding
+GROUP
+ATOM 2C1   CC3162    0.29  ! Charge from OMEA
+
+BOND 1CD1 2C1
+
+!Thermalized IC
+IC   1CB  1CG  1CD1  2C1     1.5246  112.48  -3.00  131.05   1.51
+IC   1CG  1CD1  2C1  2O5     1.4218  131.05 -49.37  110.03   1.4241
+IC   1CG  1CD1  2C1  2H1     1.4218  131.05  63.59  112.01   1.1125
+IC   1CD1  2C1  2O5  2C5     1.4191  110.03 -77.17  109.91   1.4591
+
 
 PRES CERB           0.11 ! og equatorial patch of ceramide to C1 [based on patch OCTB]
                          ! e.g., patch CERB CARB CER
@@ -753,3 +776,6 @@ IC   1O1  2C1  2O5   2C5    1.3783  104.39  165.66  116.13   1.4242
 !IC  2O1  1C1S 1C2S 1C3S    1.4262  110.89 -178.19  111.72   1.5390
 !IC  1C2S 2O1 *1C1S 1H1S    1.5661  113.71 -128.80  113.66   1.0672
 !IC  1C2S 2O1 *1C1S 1H1T    1.5661  113.71  111.70  104.83   1.1576
+
+
+
