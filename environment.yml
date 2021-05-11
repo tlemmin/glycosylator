@@ -1,0 +1,10 @@
+name: glycosylator
+channels:
+  - insilichem
+  - defaults
+dependencies:
+  - prody=1.10.8=py27h04863e7_0
+  - numpy=1.16.4=py27h7e9f1db_0
+  - matplotlib=2.2.3=py27hb69df0a_0
+  - networkx=2.2=py27_1
+  - pmw
