@@ -13,13 +13,10 @@ Glycosylator has been implemented in a generic way allowing the user to expand t
 Please cite:
 https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-019-3097-6
 
-## Computing Environment
-Glycosylator was developed with the following packages:
+## Dependencies
+Glycosylator was developed with the following environment:
 ```
-prody == 1.9.4
-numpy == 1.15.1
-matplotlib == 2.1.2
-networkx == 2.1
+conda env create -f environment.yml
 ```
 ## Usage 
 To open the GUI:
