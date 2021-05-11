@@ -2,6 +2,7 @@ name: glycosylator
 channels:
   - insilichem
   - defaults
+  - conda-forge
 dependencies:
   - prody=1.10.8=py27h04863e7_0
   - numpy=1.16.4=py27h7e9f1db_0
