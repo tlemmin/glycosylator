@@ -3811,7 +3811,7 @@ class Drawer():
                 color = [.5, .5, .5]
             r = rr
             if i:
-                r += ord(i.upper()) - 64 
+                r = float(r) + ord(i.upper()) - 64 
             r = (float(r)-start_resid)/self.scaling
             new_pos = np.array([0., 0.])
             new_pos[axis] = pos[axis] + r
