@@ -74,14 +74,14 @@ Two scripts are available for generating the coordinates: ./support/scripts/
  - XML2PDB.py: extracts the structure from RCSB XML molecule file. 
 
 ## Setting up topology for Molecular Dynamics simulations
-Glycosylator does not build directly the topology for MD simulations. However, the output is fully compatible with several very good tools.
+Glycosylator does not build directly the topology file for MD simulations. However, the output is fully compatible with several very good tools.
 ### VMD
 Available from Theoretical and Computational Biophysics Group at UIUC: https://www.ks.uiuc.edu/Research/vmd/
-1. autopsf: In most cases, glycans are dectected correctly. 
-2. psfgen: manually combine the topology of the protein with the (see demo D10_psfgen)
+1. autopsf: In most cases, glycans are dectected correctly and the topology file is generated automatically.
+2. psfgen: Manually build the topology for glycans and combine the topology of the protein . Glycosylator provides a list of patches for connecting glycans. (see demo D10_psfgen)
+
 ### CHARMM-GUI
 CHARMM-GUI requires the `CONECT` field for the glycans. @Vikasdubey0551 suggested two approaches (see issue 2):
-
 #### Pymol
 1. load glycan pdb to pymol
 2. in pymol command line, write the following :
