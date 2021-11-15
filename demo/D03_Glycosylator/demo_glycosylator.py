@@ -41,7 +41,7 @@ myMan8.define_torsionals(hydrogens=False)
 print '#'*50
 print 'Loading glycoprotein'
 myGlycosylator.load_glycoprotein(os.path.join(gl.GLYCOSYLATOR_PATH, 'support/examples/env_4tvp.pdb'))
-myGlycosylator.build_glycan_topology(patch = 'NGLB')
+myGlycosylator.build_glycan_topology(patch = 'NGLB', build_all = False)
 #Identify all glycans
 print 'Detected glycans'
 print '-'*50
