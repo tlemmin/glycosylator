@@ -18,6 +18,7 @@ Glycosylator was developed with the following environment:
 ```
 conda env create -f environment.yml
 ```
+The dependencies for python2.7 are getting very old. networkx installed a newer version of `decoretor`, which is not compatible with python2.7. The older version can be found in the `support` folder.
 ## Usage 
 To open the GUI:
 ```python glycosylator_GUI.py```
