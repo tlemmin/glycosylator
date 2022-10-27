@@ -1566,7 +1566,7 @@ class Glycosylator:
         try:
             conn = sqlite3.connect(filename)
         except:
-            print "Error while connecting to the database " + filename
+            print("Error while connecting to the database " + filename)
             return -1
         cursor =  conn.cursor()
         cursor.execute("SELECT * FROM glycans")
@@ -1609,7 +1609,7 @@ class Glycosylator:
         try:
             conn = sqlite3.connect(filename)
         except:
-            print "Error while connecting to the database " + filename
+            print("Error while connecting to the database " + filename)
             return -1
         cursor =  conn.cursor()
         tn = 'glycans'
