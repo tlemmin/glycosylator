@@ -1,3 +1,14 @@
+
+# New implementation in python 3.0 available :)
+https://github.com/ibmm-unibe-ch/glycosylator
+
+Installation
+
+```
+pip install glycosylator
+```
+
+
 ![alt text](./icons/glycosylator_logo.png)
 # A Python framework for the rapid modeling of glycans
 Glycosylator is a Python framework for the identification, modeling and
